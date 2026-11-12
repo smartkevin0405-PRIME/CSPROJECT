@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="margin:0">
+<title>스마트 현관판 배선도</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<style>
+/* 배치: 위에 읽는 법, 가운데 넓은 배선 도면(가로 스크롤), 아래에 같은 내용을 표로 */
+:root{
+  --bg:#f4f6f3; --panel:#ffffff; --ink:#1b231f; --muted:#5a665e; --line:#cdd5ce; --accent:#0d7a68; --soft:#e7ece7;
+  --w-5v:#e03131; --w-3v3:#f08c00; --w-gnd:#2c322f; --w-sck:#1c7ed6; --w-mosi:#7048e8; --w-cs:#0c9f8f; --w-dc:#d6336c;
+  --w-rst:#a15c2b; --w-sda:#2f9e44; --w-rrst:#ae3ec9; --w-miso:#1098ad; --w-dht:#9a8500; --w-servo:#5c940d; --w-pir:#4263eb; --w-door:#5f7d95;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#111513; --panel:#1a201d; --ink:#e5ebe6; --muted:#9aa79f; --line:#34413a; --accent:#45c4aa; --soft:#232b27;
+  --w-5v:#ff6b6b; --w-3v3:#ffa94d; --w-gnd:#d3dad5; --w-sck:#4dabf7; --w-mosi:#9775fa; --w-cs:#38d9a9; --w-dc:#f783ac;
+  --w-rst:#d9a066; --w-sda:#69db7c; --w-rrst:#da77f2; --w-miso:#3bc9db; --w-dht:#ffd43b; --w-servo:#a9e34b; --w-pir:#748ffc; --w-door:#99b3c9; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#111513; --panel:#1a201d; --ink:#e5ebe6; --muted:#9aa79f; --line:#34413a; --accent:#45c4aa; --soft:#232b27;
+  --w-5v:#ff6b6b; --w-3v3:#ffa94d; --w-gnd:#d3dad5; --w-sck:#4dabf7; --w-mosi:#9775fa; --w-cs:#38d9a9; --w-dc:#f783ac;
+  --w-rst:#d9a066; --w-sda:#69db7c; --w-rrst:#da77f2; --w-miso:#3bc9db; --w-dht:#ffd43b; --w-servo:#a9e34b; --w-pir:#748ffc; --w-door:#99b3c9; color-scheme:dark }
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+.wrap{max-width:1220px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1{font-size:26px;font-weight:600;margin:0;text-wrap:balance;letter-spacing:-0.01em}
+h2{font-size:17px;font-weight:600;margin:0}
+p{margin:0;max-width:68ch}
+.lead{color:var(--muted)}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px 28px;margin:0;padding:0;list-style:none}
+.rules li{padding-left:14px;border-left:2px solid var(--accent);border-radius:0}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow-x:auto;padding:10px}
+.board svg{display:block}
+.hint{font-size:13px;color:var(--muted)}
+svg text{font-family:var(--sans);fill:var(--ink)}
+svg .h{font-size:14px;font-weight:600}
+svg .n{font-size:11.5px;fill:var(--muted)}
+svg .p{font-family:var(--mono);font-size:12px}
+svg .p.nc{fill:var(--muted)}
+svg .rl{font-size:12px;font-weight:500}
+.uno{fill:color-mix(in srgb,var(--accent) 13%,var(--panel));stroke:var(--accent);stroke-width:1.5}
+.mx{fill:none;stroke:var(--accent);stroke-width:1;stroke-dasharray:3 3}
+.bb{fill:var(--soft);stroke:var(--line);stroke-width:1.5}
+.mod{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.div{fill:var(--panel);stroke:var(--line)}
+.rail{fill:color-mix(in srgb,var(--c) 16%,var(--panel));stroke:var(--c)}
+.pad{fill:var(--panel);stroke:var(--ink);stroke-width:1.2}
+.pad.nc{stroke:var(--muted);stroke-dasharray:2 2}
+.w{fill:none;stroke:var(--c);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round;cursor:pointer;transition:opacity .15s}
+.w:hover{stroke-width:4}
+.sel .w{opacity:.13}
+.sel .w.on{opacity:1;stroke-width:4}
+.tablebox{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+th,td{text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--muted);font-size:12.5px}
+tbody tr{cursor:pointer}
+tbody tr:hover,tbody tr.on{background:var(--soft)}
+tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+tbody tr:last-child td{border-bottom:0}
+.mono{font-family:var(--mono);font-size:13px}
+.sw{display:inline-block;width:18px;height:4px;border-radius:2px;background:var(--c);margin-right:10px;vertical-align:middle}
+button{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+@media (prefers-reduced-motion: reduce){.w{transition:none}}
+</style>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <h1>스마트 현관판 배선도</h1>
+    <p class="lead">모듈 핀마다 점퍼선 한 가닥이 어디로 가는지 그린 도면이다. 부품이 도착하기 전 초안이라, 모듈에 인쇄된 핀 이름을 보고 맞춰 연결한다.</p>
+  </header>
+  <ul class="rules">
+    <li>5V 어댑터는 보드의 배럴잭에 꽂지 않는다. DC 터미널을 거쳐 서보에만 연결한다.</li>
+    <li>보드에서 화면과 RFID로 나가는 신호 7개는 1kΩ·2kΩ 분압을 거친다.</li>
+    <li>RC522는 3.3V에 연결한다. 화면의 SDO 핀은 비워 둔다.</li>
+    <li>GND는 모든 모듈과 어댑터까지 한 줄로 묶는다.</li>
+  </ul>
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <div class="bar"><h2>도면</h2><button type="button" id="clear" hidden>선택 해제</button></div>
+    <div class="board" id="board"><svg viewBox="0 0 1190 1406" width="1190" height="1406" role="img" aria-label="스마트 현관판 배선도">
+<rect class="uno" x="40" y="70" width="210" height="650" rx="10"/>
+<text x="56" y="98" class="h" text-anchor="start">Arduino UNO R4 WiFi</text>
+<text x="56" y="116" class="n" text-anchor="start">USB-C로 전원 공급</text>
+<rect class="mx" x="58" y="300" width="96" height="64" rx="4"/>
+<text x="106" y="336" class="n" text-anchor="middle">LED 매트릭스</text>
+<rect class="pad" x="244" y="114" width="12" height="12" rx="2"/>
+<text x="236" y="124" class="p" text-anchor="end">5V</text>
+<rect class="pad" x="244" y="154" width="12" height="12" rx="2"/>
+<text x="236" y="164" class="p" text-anchor="end">3.3V</text>
+<rect class="pad" x="244" y="194" width="12" height="12" rx="2"/>
+<text x="236" y="204" class="p" text-anchor="end">GND</text>
+<rect class="pad" x="244" y="234" width="12" height="12" rx="2"/>
+<text x="236" y="244" class="p" text-anchor="end">D13 · SCK</text>
+<rect class="pad" x="244" y="274" width="12" height="12" rx="2"/>
+<text x="236" y="284" class="p" text-anchor="end">D11 · MOSI</text>
+<rect class="pad" x="244" y="314" width="12" height="12" rx="2"/>
+<text x="236" y="324" class="p" text-anchor="end">D10</text>
+<rect class="pad" x="244" y="354" width="12" height="12" rx="2"/>
+<text x="236" y="364" class="p" text-anchor="end">D8</text>
+<rect class="pad" x="244" y="394" width="12" height="12" rx="2"/>
+<text x="236" y="404" class="p" text-anchor="end">D7</text>
+<rect class="pad" x="244" y="434" width="12" height="12" rx="2"/>
+<text x="236" y="444" class="p" text-anchor="end">D6</text>
+<rect class="pad" x="244" y="474" width="12" height="12" rx="2"/>
+<text x="236" y="484" class="p" text-anchor="end">D5</text>
+<rect class="pad" x="244" y="514" width="12" height="12" rx="2"/>
+<text x="236" y="524" class="p" text-anchor="end">D12 · MISO</text>
+<rect class="pad" x="244" y="554" width="12" height="12" rx="2"/>
+<text x="236" y="564" class="p" text-anchor="end">D4</text>
+<rect class="pad" x="244" y="594" width="12" height="12" rx="2"/>
+<text x="236" y="604" class="p" text-anchor="end">D3</text>
+<rect class="pad" x="244" y="634" width="12" height="12" rx="2"/>
+<text x="236" y="644" class="p" text-anchor="end">A0</text>
+<rect class="pad" x="244" y="674" width="12" height="12" rx="2"/>
+<text x="236" y="684" class="p" text-anchor="end">D2</text>
+<rect class="bb" x="450" y="78" width="190" height="432" rx="10"/>
+<text x="545.0" y="98" class="h" text-anchor="middle">브레드보드</text>
+<rect class="rail" style="--c:var(--w-5v)" x="464" y="108" width="162" height="24" rx="5"/>
+<text x="545.0" y="124" class="rl" text-anchor="middle">5V 분배 줄</text>
+<rect class="pad" x="444" y="114" width="12" height="12" rx="2"/>
+<rect class="rail" style="--c:var(--w-3v3)" x="464" y="148" width="162" height="24" rx="5"/>
+<text x="545.0" y="164" class="rl" text-anchor="middle">3.3V 분배 줄</text>
+<rect class="pad" x="444" y="154" width="12" height="12" rx="2"/>
+<rect class="rail" style="--c:var(--w-gnd)" x="464" y="188" width="162" height="24" rx="5"/>
+<text x="545.0" y="204" class="rl" text-anchor="middle">GND 분배 줄</text>
+<rect class="pad" x="444" y="194" width="12" height="12" rx="2"/>
+<rect class="div" x="464" y="227" width="162" height="26" rx="5"/>
+<text x="545.0" y="244" class="p" text-anchor="middle">분압 1kΩ · 2kΩ</text>
+<rect class="pad" x="444" y="234" width="12" height="12" rx="2"/>
+<rect class="div" x="464" y="267" width="162" height="26" rx="5"/>
+<text x="545.0" y="284" class="p" text-anchor="middle">분압 1kΩ · 2kΩ</text>
+<rect class="pad" x="444" y="274" width="12" height="12" rx="2"/>
+<rect class="div" x="464" y="307" width="162" height="26" rx="5"/>
+<text x="545.0" y="324" class="p" text-anchor="middle">분압 1kΩ · 2kΩ</text>
+<rect class="pad" x="444" y="314" width="12" height="12" rx="2"/>
+<rect class="div" x="464" y="347" width="162" height="26" rx="5"/>
+<text x="545.0" y="364" class="p" text-anchor="middle">분압 1kΩ · 2kΩ</text>
+<rect class="pad" x="444" y="354" width="12" height="12" rx="2"/>
+<rect class="div" x="464" y="387" width="162" height="26" rx="5"/>
+<text x="545.0" y="404" class="p" text-anchor="middle">분압 1kΩ · 2kΩ</text>
+<rect class="pad" x="444" y="394" width="12" height="12" rx="2"/>
+<rect class="div" x="464" y="427" width="162" height="26" rx="5"/>
+<text x="545.0" y="444" class="p" text-anchor="middle">분압 1kΩ · 2kΩ</text>
+<rect class="pad" x="444" y="434" width="12" height="12" rx="2"/>
+<rect class="div" x="464" y="467" width="162" height="26" rx="5"/>
+<text x="545.0" y="484" class="p" text-anchor="middle">분압 1kΩ · 2kΩ</text>
+<rect class="pad" x="444" y="474" width="12" height="12" rx="2"/>
+<rect class="mod" x="912" y="70" width="248" height="300" rx="10"/>
+<text x="934" y="92" class="h" text-anchor="start">3.5인치 TFT (THL-CD07)</text>
+<rect class="pad" x="906" y="110" width="12" height="12" rx="2"/>
+<text x="934" y="120" class="p" text-anchor="start">1 VCC</text>
+<rect class="pad" x="906" y="136" width="12" height="12" rx="2"/>
+<text x="934" y="146" class="p" text-anchor="start">2 GND</text>
+<rect class="pad" x="906" y="162" width="12" height="12" rx="2"/>
+<text x="934" y="172" class="p" text-anchor="start">3 CS</text>
+<rect class="pad" x="906" y="188" width="12" height="12" rx="2"/>
+<text x="934" y="198" class="p" text-anchor="start">4 RESET</text>
+<rect class="pad" x="906" y="214" width="12" height="12" rx="2"/>
+<text x="934" y="224" class="p" text-anchor="start">5 DC/RS</text>
+<rect class="pad" x="906" y="240" width="12" height="12" rx="2"/>
+<text x="934" y="250" class="p" text-anchor="start">6 SDI(MOSI)</text>
+<rect class="pad" x="906" y="266" width="12" height="12" rx="2"/>
+<text x="934" y="276" class="p" text-anchor="start">7 SCK</text>
+<rect class="pad" x="906" y="292" width="12" height="12" rx="2"/>
+<text x="934" y="302" class="p" text-anchor="start">8 LED</text>
+<rect class="pad nc" x="906" y="318" width="12" height="12" rx="2"/>
+<text x="934" y="328" class="p nc" text-anchor="start">9 SDO(MISO) · 비움</text>
+<text x="934" y="360" class="n" text-anchor="start">10~14번 터치 핀과 SD 4핀은 비움</text>
+<rect class="mod" x="912" y="388" width="248" height="274" rx="10"/>
+<text x="934" y="410" class="h" text-anchor="start">RFID RC522</text>
+<rect class="pad" x="906" y="428" width="12" height="12" rx="2"/>
+<text x="934" y="438" class="p" text-anchor="start">SDA</text>
+<rect class="pad" x="906" y="454" width="12" height="12" rx="2"/>
+<text x="934" y="464" class="p" text-anchor="start">SCK</text>
+<rect class="pad" x="906" y="480" width="12" height="12" rx="2"/>
+<text x="934" y="490" class="p" text-anchor="start">MOSI</text>
+<rect class="pad" x="906" y="506" width="12" height="12" rx="2"/>
+<text x="934" y="516" class="p" text-anchor="start">MISO</text>
+<rect class="pad nc" x="906" y="532" width="12" height="12" rx="2"/>
+<text x="934" y="542" class="p nc" text-anchor="start">IRQ · 비움</text>
+<rect class="pad" x="906" y="558" width="12" height="12" rx="2"/>
+<text x="934" y="568" class="p" text-anchor="start">GND</text>
+<rect class="pad" x="906" y="584" width="12" height="12" rx="2"/>
+<text x="934" y="594" class="p" text-anchor="start">RST</text>
+<rect class="pad" x="906" y="610" width="12" height="12" rx="2"/>
+<text x="934" y="620" class="p" text-anchor="start">3.3V</text>
+<text x="934" y="652" class="n" text-anchor="start">5V에 연결하지 않음</text>
+<rect class="mod" x="912" y="680" width="248" height="130" rx="10"/>
+<text x="934" y="702" class="h" text-anchor="start">PIR HC-SR501</text>
+<rect class="pad" x="906" y="720" width="12" height="12" rx="2"/>
+<text x="934" y="730" class="p" text-anchor="start">VCC</text>
+<rect class="pad" x="906" y="746" width="12" height="12" rx="2"/>
+<text x="934" y="756" class="p" text-anchor="start">OUT</text>
+<rect class="pad" x="906" y="772" width="12" height="12" rx="2"/>
+<text x="934" y="782" class="p" text-anchor="start">GND</text>
+<rect class="mod" x="912" y="828" width="248" height="130" rx="10"/>
+<text x="934" y="850" class="h" text-anchor="start">온습도 DHT11</text>
+<rect class="pad" x="906" y="868" width="12" height="12" rx="2"/>
+<text x="934" y="878" class="p" text-anchor="start">VCC (+)</text>
+<rect class="pad" x="906" y="894" width="12" height="12" rx="2"/>
+<text x="934" y="904" class="p" text-anchor="start">DATA (S)</text>
+<rect class="pad" x="906" y="920" width="12" height="12" rx="2"/>
+<text x="934" y="930" class="p" text-anchor="start">GND (−)</text>
+<rect class="mod" x="912" y="976" width="248" height="130" rx="10"/>
+<text x="934" y="998" class="h" text-anchor="start">서보 SG90</text>
+<rect class="pad" x="906" y="1016" width="12" height="12" rx="2"/>
+<text x="934" y="1026" class="p" text-anchor="start">주황 · 신호</text>
+<rect class="pad" x="906" y="1042" width="12" height="12" rx="2"/>
+<text x="934" y="1052" class="p" text-anchor="start">빨강 · +</text>
+<rect class="pad" x="906" y="1068" width="12" height="12" rx="2"/>
+<text x="934" y="1078" class="p" text-anchor="start">갈색 · −</text>
+<rect class="mod" x="912" y="1124" width="248" height="118" rx="10"/>
+<text x="934" y="1146" class="h" text-anchor="start">문 센서 MC-38</text>
+<rect class="pad" x="906" y="1164" width="12" height="12" rx="2"/>
+<text x="934" y="1174" class="p" text-anchor="start">선 1</text>
+<rect class="pad" x="906" y="1190" width="12" height="12" rx="2"/>
+<text x="934" y="1200" class="p" text-anchor="start">선 2</text>
+<text x="934" y="1232" class="n" text-anchor="start">두 선은 극성이 없음</text>
+<rect class="mod" x="912" y="1260" width="248" height="118" rx="10"/>
+<text x="934" y="1282" class="h" text-anchor="start">DC 터미널 (5V 어댑터)</text>
+<rect class="pad" x="906" y="1300" width="12" height="12" rx="2"/>
+<text x="934" y="1310" class="p" text-anchor="start">+</text>
+<rect class="pad" x="906" y="1326" width="12" height="12" rx="2"/>
+<text x="934" y="1336" class="p" text-anchor="start">−</text>
+<text x="934" y="1368" class="n" text-anchor="start">콘덴서 1000µF를 +와 − 사이에</text>
+<path class="w" data-net="5V" style="--c:var(--w-5v)" d="M256 120H444"><title>5V 전원</title></path>
+<path class="w" data-net="3V3" style="--c:var(--w-3v3)" d="M256 160H444"><title>3.3V 전원</title></path>
+<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M256 200H444"><title>GND</title></path>
+<path class="w" data-net="D13" style="--c:var(--w-sck)" d="M256 240H444"><title>SPI 클럭</title></path>
+<path class="w" data-net="D11" style="--c:var(--w-mosi)" d="M256 280H444"><title>SPI 데이터 (보드→모듈)</title></path>
+<path class="w" data-net="D10" style="--c:var(--w-cs)" d="M256 320H444"><title>화면 선택</title></path>
+<path class="w" data-net="D8" style="--c:var(--w-dc)" d="M256 360H444"><title>화면 명령/데이터</title></path>
+<path class="w" data-net="D7" style="--c:var(--w-rst)" d="M256 400H444"><title>화면 리셋</title></path>
+<path class="w" data-net="D6" style="--c:var(--w-sda)" d="M256 440H444"><title>RFID 선택</title></path>
+<path class="w" data-net="D5" style="--c:var(--w-rrst)" d="M256 480H444"><title>RFID 리셋</title></path>
+<path class="w" data-net="5V" style="--c:var(--w-5v)" d="M640 113.5H802.4V116H906"><title>5V 전원</title></path>
+<path class="w" data-net="5V" style="--c:var(--w-5v)" d="M640 120.0H836.0V726H906"><title>5V 전원</title></path>
+<path class="w" data-net="5V" style="--c:var(--w-5v)" d="M640 126.5H869.6V874H906"><title>5V 전원</title></path>
+<path class="w" data-net="3V3" style="--c:var(--w-3v3)" d="M640 156.8H861.2V298H906"><title>3.3V 전원</title></path>
+<path class="w" data-net="3V3" style="--c:var(--w-3v3)" d="M640 163.2H852.8V616H906"><title>3.3V 전원</title></path>
+<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 183.8H718.4V142H906"><title>GND</title></path>
+<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 190.2H768.8V564H906"><title>GND</title></path>
+<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 196.8H827.6V778H906"><title>GND</title></path>
+<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 203.2H810.8V926H906"><title>GND</title></path>
+<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 209.8H743.6V1196H906"><title>GND</title></path>
+<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 216.2H676.4V1332H906"><title>GND</title></path>
+<path class="w" data-net="D13" style="--c:var(--w-sck)" d="M640 236.8H668.0V272H906"><title>SPI 클럭</title></path>
+<path class="w" data-net="D13" style="--c:var(--w-sck)" d="M640 243.2H844.4V460H906"><title>SPI 클럭</title></path>
+<path class="w" data-net="D11" style="--c:var(--w-mosi)" d="M640 276.8H777.2V246H906"><title>SPI 데이터 (보드→모듈)</title></path>
+<path class="w" data-net="D11" style="--c:var(--w-mosi)" d="M640 283.2H752.0V486H906"><title>SPI 데이터 (보드→모듈)</title></path>
+<path class="w" data-net="D10" style="--c:var(--w-cs)" d="M640 320.0H785.6V168H906"><title>화면 선택</title></path>
+<path class="w" data-net="D8" style="--c:var(--w-dc)" d="M640 360.0H794.0V220H906"><title>화면 명령/데이터</title></path>
+<path class="w" data-net="D7" style="--c:var(--w-rst)" d="M640 400.0H819.2V194H906"><title>화면 리셋</title></path>
+<path class="w" data-net="D6" style="--c:var(--w-sda)" d="M640 440.0H693.2V434H906"><title>RFID 선택</title></path>
+<path class="w" data-net="D5" style="--c:var(--w-rrst)" d="M640 480.0H735.2V590H906"><title>RFID 리셋</title></path>
+<path class="w" data-net="D12" style="--c:var(--w-miso)" d="M256 520H701.6V512H906"><title>SPI 데이터 (모듈→보드)</title></path>
+<path class="w" data-net="D4" style="--c:var(--w-dht)" d="M256 560H726.8V900H906"><title>온습도 데이터</title></path>
+<path class="w" data-net="D3" style="--c:var(--w-servo)" d="M256 600H710.0V1022H906"><title>서보 신호</title></path>
+<path class="w" data-net="A0" style="--c:var(--w-pir)" d="M256 640H760.4V752H906"><title>PIR 출력</title></path>
+<path class="w" data-net="D2" style="--c:var(--w-door)" d="M256 680H684.8V1170H906"><title>문 센서</title></path>
+<path class="w" data-net="SV" style="--c:var(--w-5v)" d="M906 1306H890V1048H906"><title>서보 전원 +</title></path>
+<path class="w" data-net="SG" style="--c:var(--w-gnd)" d="M906 1332H898V1074H906"><title>서보 전원 −</title></path>
+</svg></div>
+    <p class="hint">선이나 아래 표의 줄을 누르면 그 선만 진하게 보인다. 좁은 화면에서는 도면을 옆으로 밀어서 본다.</p>
+  </section>
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <h2>선 목록</h2>
+    <div class="tablebox"><table>
+      <thead><tr><th>보드 핀</th><th>거치는 곳</th><th>모듈</th><th>모듈 핀</th></tr></thead>
+      <tbody id="rows"><tr data-net="5V"><td><span class="sw" style="--c:var(--w-5v)"></span>5V</td><td>분배 줄</td><td>3.5인치 TFT (THL-CD07)</td><td class="mono">1 VCC</td></tr>
+<tr data-net="5V"><td><span class="sw" style="--c:var(--w-5v)"></span>5V</td><td>분배 줄</td><td>PIR HC-SR501</td><td class="mono">VCC</td></tr>
+<tr data-net="5V"><td><span class="sw" style="--c:var(--w-5v)"></span>5V</td><td>분배 줄</td><td>온습도 DHT11</td><td class="mono">VCC (+)</td></tr>
+<tr data-net="3V3"><td><span class="sw" style="--c:var(--w-3v3)"></span>3.3V</td><td>분배 줄</td><td>3.5인치 TFT (THL-CD07)</td><td class="mono">8 LED</td></tr>
+<tr data-net="3V3"><td><span class="sw" style="--c:var(--w-3v3)"></span>3.3V</td><td>분배 줄</td><td>RFID RC522</td><td class="mono">3.3V</td></tr>
+<tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>3.5인치 TFT (THL-CD07)</td><td class="mono">2 GND</td></tr>
+<tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>RFID RC522</td><td class="mono">GND</td></tr>
+<tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>PIR HC-SR501</td><td class="mono">GND</td></tr>
+<tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>온습도 DHT11</td><td class="mono">GND (−)</td></tr>
+<tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>문 센서 MC-38</td><td class="mono">선 2</td></tr>
+<tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>DC 터미널 (5V 어댑터)</td><td class="mono">−</td></tr>
+<tr data-net="D13"><td><span class="sw" style="--c:var(--w-sck)"></span>D13 · SCK</td><td>분압 1kΩ·2kΩ</td><td>3.5인치 TFT (THL-CD07)</td><td class="mono">7 SCK</td></tr>
+<tr data-net="D13"><td><span class="sw" style="--c:var(--w-sck)"></span>D13 · SCK</td><td>분압 1kΩ·2kΩ</td><td>RFID RC522</td><td class="mono">SCK</td></tr>
+<tr data-net="D11"><td><span class="sw" style="--c:var(--w-mosi)"></span>D11 · MOSI</td><td>분압 1kΩ·2kΩ</td><td>3.5인치 TFT (THL-CD07)</td><td class="mono">6 SDI(MOSI)</td></tr>
+<tr data-net="D11"><td><span class="sw" style="--c:var(--w-mosi)"></span>D11 · MOSI</td><td>분압 1kΩ·2kΩ</td><td>RFID RC522</td><td class="mono">MOSI</td></tr>
+<tr data-net="D10"><td><span class="sw" style="--c:var(--w-cs)"></span>D10</td><td>분압 1kΩ·2kΩ</td><td>3.5인치 TFT (THL-CD07)</td><td class="mono">3 CS</td></tr>
+<tr data-net="D8"><td><span class="sw" style="--c:var(--w-dc)"></span>D8</td><td>분압 1kΩ·2kΩ</td><td>3.5인치 TFT (THL-CD07)</td><td class="mono">5 DC/RS</td></tr>
+<tr data-net="D7"><td><span class="sw" style="--c:var(--w-rst)"></span>D7</td><td>분압 1kΩ·2kΩ</td><td>3.5인치 TFT (THL-CD07)</td><td class="mono">4 RESET</td></tr>
+<tr data-net="D6"><td><span class="sw" style="--c:var(--w-sda)"></span>D6</td><td>분압 1kΩ·2kΩ</td><td>RFID RC522</td><td class="mono">SDA</td></tr>
+<tr data-net="D5"><td><span class="sw" style="--c:var(--w-rrst)"></span>D5</td><td>분압 1kΩ·2kΩ</td><td>RFID RC522</td><td class="mono">RST</td></tr>
+<tr data-net="D12"><td><span class="sw" style="--c:var(--w-miso)"></span>D12 · MISO</td><td>직결</td><td>RFID RC522</td><td class="mono">MISO</td></tr>
+<tr data-net="D4"><td><span class="sw" style="--c:var(--w-dht)"></span>D4</td><td>직결</td><td>온습도 DHT11</td><td class="mono">DATA (S)</td></tr>
+<tr data-net="D3"><td><span class="sw" style="--c:var(--w-servo)"></span>D3</td><td>직결</td><td>서보 SG90</td><td class="mono">주황 · 신호</td></tr>
+<tr data-net="A0"><td><span class="sw" style="--c:var(--w-pir)"></span>A0</td><td>직결</td><td>PIR HC-SR501</td><td class="mono">OUT</td></tr>
+<tr data-net="D2"><td><span class="sw" style="--c:var(--w-door)"></span>D2</td><td>직결</td><td>문 센서 MC-38</td><td class="mono">선 1</td></tr>
+<tr data-net="SV"><td><span class="sw" style="--c:var(--w-5v)"></span>DC 터미널 +</td><td>직결</td><td>서보 SG90</td><td class="mono">빨강 · +</td></tr>
+<tr data-net="SG"><td><span class="sw" style="--c:var(--w-gnd)"></span>DC 터미널 −</td><td>직결</td><td>서보 SG90</td><td class="mono">갈색 · −</td></tr></tbody>
+    </table></div>
+  </section>
+</div>
+<script>
+(function(){
+  var board=document.getElementById('board'),rows=document.getElementById('rows'),clear=document.getElementById('clear');
+  function pick(net){
+    var same=board.dataset.net===net; var n=same?'':net; board.dataset.net=n;
+    board.classList.toggle('sel',!!n); clear.hidden=!n;
+    board.querySelectorAll('.w').forEach(function(w){w.classList.toggle('on',w.dataset.net===n)});
+    rows.querySelectorAll('tr').forEach(function(r){r.classList.toggle('on',r.dataset.net===n)});
+  }
+  board.addEventListener('click',function(e){var w=e.target.closest('.w'); if(w) pick(w.dataset.net);});
+  rows.querySelectorAll('tr').forEach(function(r){r.tabIndex=0;
+    r.addEventListener('click',function(){pick(r.dataset.net)});
+    r.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(r.dataset.net)}});});
+  clear.addEventListener('click',function(){pick(board.dataset.net)});
+})();
+</script>
+
+</body>
+</html>
