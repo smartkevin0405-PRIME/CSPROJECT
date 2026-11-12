@@ -44,6 +44,7 @@ bool fetchWeather(WeatherInfo& out) {
   out.tempC = 12;
   out.sky = (out.kind == WX_SUNNY) ? 1 : 4;
   out.pty = (out.kind == WX_RAIN) ? 1 : (out.kind == WX_SNOW ? 3 : 0);
+  out.nowPty = out.pty;
   return true;
 }
 
@@ -253,7 +254,7 @@ static void kstDate(uint32_t epoch, int& y, int& m, int& d, int& hour) {
 }
 
 bool fetchWeather(WeatherInfo& out) {
-  out.ok = false; out.tempC = -128; out.sky = 0; out.pty = 255; out.kind = WX_UNKNOWN;
+  out.ok = false; out.tempC = -128; out.sky = 0; out.pty = 255; out.nowPty = 255; out.kind = WX_UNKNOWN;
   uint32_t now = netEpoch();
   if (now < 1600000000UL) return false;                  // 시각을 아직 못 받았다
 
@@ -269,7 +270,7 @@ bool fetchWeather(WeatherInfo& out) {
   busy = true;
   WiFiClient client;
   bool gotTemp = false, gotSky = false, rain = false, snow = false;
-  uint8_t nPty = 0, nSky = 0, nT1h = 0, maxSky = 0, firstPty = 0;
+  uint8_t nPty = 0, nSky = 0, nT1h = 0, maxSky = 0, firstPty = 0, nowPty = 255;
   if (httpOpen(client, "apis.data.go.kr", path)) {
     JsonScan scan(client);
     char key[12], val[16], cat[4] = "", fval[8] = "";
@@ -284,7 +285,9 @@ bool fetchWeather(WeatherInfo& out) {
       // 예보 한 건이 끝났다. 같은 항목은 가까운 시각부터 차례로 온다
       if (cat[0] != 0) {
         int v = atoi(fval);
-        if (strcmp(cat, "PTY") == 0 && nPty++ < 3) {
+        if (strcmp(cat, "PTY") == 0 && nPty < 3) {
+          if (nPty == 0) nowPty = (uint8_t)v;               // 첫 PTY = 가장 가까운 예보 시각 (학습용)
+          nPty++;
           if (v == 1 || v == 2 || v == 5 || v == 6) rain = true;
           if (v == 3 || v == 7) snow = true;
           if (firstPty == 0) firstPty = (uint8_t)v;
@@ -305,6 +308,7 @@ bool fetchWeather(WeatherInfo& out) {
   if (!gotTemp || !gotSky) return false;
   out.sky = maxSky;
   out.pty = firstPty;
+  out.nowPty = nowPty;
   if (rain) out.kind = WX_RAIN;
   else if (snow) out.kind = WX_SNOW;
   else if (maxSky >= 3) out.kind = WX_CLOUDY;

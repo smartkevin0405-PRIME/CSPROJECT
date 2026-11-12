@@ -19,7 +19,7 @@ static uint32_t stateSince = 0;          // 지금 상태에 들어온 시각
 static State    afterMessage = ST_IDLE;  // 안내 문구가 끝난 뒤 갈 상태
 static uint32_t messageMs = 0;
 
-static WeatherInfo weather = { false, -128, 0, 255, WX_UNKNOWN };
+static WeatherInfo weather = { false, -128, 0, 255, 255, WX_UNKNOWN };
 static uint32_t    weatherAt = 0;
 static bool        weatherTried = false;
 
@@ -48,7 +48,7 @@ static uint32_t departedAt = 0;
 uint32_t hostEpochNow()  { return netEpoch(); }
 bool     hostWifiReady() { return netReady(); }
 bool     hostNetIdle()   { return !netBusy(); }
-uint8_t  hostWeatherPty(){ return weather.ok ? weather.pty : 255; }
+uint8_t  hostWeatherPty(){ return weather.ok ? weather.nowPty : 255; }   // 학습에는 지금 날씨를 쓴다
 
 static void enter(State s) {
   state = s;
@@ -175,7 +175,7 @@ static void sendDeparture() {
   strncpy(ev.stopId, STOPS[u.stopIdx[0]].key, sizeof(ev.stopId) - 1);
   ev.outdoorTempC = weather.ok ? weather.tempC : -128;
   ev.sky = weather.ok ? weather.sky : 0;
-  ev.pty = weather.ok ? weather.pty : 255;
+  ev.pty = weather.ok ? weather.nowPty : 255;    // 출발 시점 날씨 (다이얼의 '앞으로 3시간'이 아님)
   ev.arrivalCount = 0;
   if (armedUser == curUser) {
     for (uint8_t i = 0; i < u.stopCount && i < TRAVEL_MAX_ARRIVALS; i++) {
