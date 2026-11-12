@@ -8,6 +8,13 @@
 #define DEMO_MODE        1   // 1: WiFi와 API 없이 가짜 데이터로 동작 (부품·키가 오기 전 개발용)
 #define USE_TRAVEL_STUB  0   // 0: 실제 이동 시간 모듈(TravelLearn 라이브러리) 사용, 1: 240초 고정 스텁
 
+// 데모 모드는 WiFi를 연결하지 않으므로 폰과 통신할 수 없다. 그래서 이동 시간 모듈도 스텁을 쓴다.
+// (데모만 돌릴 때는 TravelLearn 라이브러리를 설치하지 않아도 된다)
+#if DEMO_MODE
+#undef  USE_TRAVEL_STUB
+#define USE_TRAVEL_STUB  1
+#endif
+
 // ---------- 핀 (설계 문서 2절과 같다) ----------
 const uint8_t PIN_DOOR     = 2;   // 문 열림 센서 MC-38
 const uint8_t PIN_SERVO    = 3;   // 날씨 다이얼 서보

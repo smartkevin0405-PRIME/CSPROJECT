@@ -1,6 +1,7 @@
 // travel_link.cpp
 // travel_iface.h의 약속을 실제 이동 시간 모듈(TravelLearn 라이브러리)로 연결한다.
-// config.h의 USE_TRAVEL_STUB가 0일 때 쓰인다. 1이면 travel_stub.cpp(240초 고정)가 대신 쓰인다.
+// config.h의 DEMO_MODE와 USE_TRAVEL_STUB가 둘 다 0일 때(실제 조회 모드) 쓰인다.
+// 그 밖에는 travel_stub.cpp(240초 고정)가 대신 쓰인다.
 // 라이브러리 위치: ../../travel-learn/arduino/TravelLearn (Arduino 라이브러리 폴더에 복사해 둔다)
 // [생성형 AI 활용] 이 파일은 Claude의 도움을 받아 작성했다.
 #include "config.h"
