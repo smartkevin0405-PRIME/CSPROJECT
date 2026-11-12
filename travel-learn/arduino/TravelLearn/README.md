@@ -11,7 +11,7 @@
 - 여유 시간 = 버스 도착까지 남은 시간 - 예상 이동 시간 - 안전 여유 를 계산한다.
 
 하지 않는 일
-- RFID, 문 열림 센서, 화면, 날씨·버스 API, Wi-Fi 연결(`WiFi.begin`), 메인 프로그램은 다른 사람이 만든다. 이 모듈은 센서를 읽지 않는다.
+- RFID, 문 열림 센서, 화면, 날씨·버스 API, Wi-Fi 연결과 재연결(`WiFi.begin`), 메인 프로그램은 현관판 메인 코드(`entrance-board/SmartEntrance`)가 맡는다. 이 모듈은 센서를 읽지 않는다.
 
 통신 형식은 [통신규격](../../docs/통신규격.md), 메모리 사용량은 [메모리_사용량](../../docs/메모리_사용량.md)을 본다.
 
@@ -32,7 +32,24 @@
 3. 명령: `d 1` 가상 출발 / `w 1` 날씨(0 없음, 1 비, 2 눈) / `e 1 1 420` 버스 420초 뒤 도착일 때 여유 계산 /
    `s` 통계 표 / `c 1` 취소 / `x` 통계 삭제 / `p` 폰 상태·IP / `h` 도움말
 
-메인 프로그램에 붙이는 방법은 `examples/BasicIntegration`을 본다(다른 사람이 채울 stub 함수가 표시되어 있다).
+## 현관판 메인 프로그램과의 연결
+
+현관판 메인 프로그램(`entrance-board/SmartEntrance`)에는 이미 연결되어 있다(2026-11-13). `travel_link.cpp`가 메인 코드의 약속(`travel_iface.h` v0.2)을 이 모듈의 함수로 바꿔 부른다.
+
+| 메인 코드 | 이 모듈 |
+|---|---|
+| `travelBegin()` (`setup()`, Wi-Fi 연결 뒤) | `setUserKey`, `setDefaultWalk`, `onDepartResult`, `onTripStored`, `begin` |
+| `travelLoop()` (`loop()`, 태그 후 API 조회 한 건이 끝날 때마다) | `loop` |
+| `travelOnDeparture(ev)` (태그 후 120초 안에 문 열림) | `notifyDeparture(user, 0, wx, tb, etaS, tempC)` |
+| `travelOnCancel(userId)` (출발 후 90초 안에 다시 태그) | `cancelDeparture` |
+| `travelGetSlackSec(...)` (정보 화면 1초마다) | `slack` |
+| `travelPhoneOnline(userId)` (정보 화면의 `PHONE OK` / `PHONE --`) | `phoneOnline` |
+
+- 사용자 번호 = 메인 코드 `USERS` 배열 위치+1, 정류장 번호 = `STOPS` 배열 위치+1. 폰 앱에 넣는 번호도 같다.
+- `wx`에는 가장 가까운 예보 시각의 강수형태를, `tb`에는 보드 시각(없으면 폰이 hello로 알려 준 시각)을 쓴다.
+- `DEMO_MODE` 1이거나 `USE_TRAVEL_STUB` 1이면 이 모듈 대신 240초 스텁이 쓰여 라이브러리를 설치하지 않아도 된다.
+
+다른 스케치에 새로 붙일 때의 최소 예는 `examples/BasicIntegration`이다.
 
 ## 공개 함수
 
@@ -113,5 +130,6 @@ cd extras/host && ./build.sh test
 - 보드에 올려 실행해 보지 못함 — 동작 검증은 호스트(g++) 빌드의 단위 시험과 종단 시험으로만 함
 - WiFiS3 connect()의 실제 차단 시간
 - EEPROM 블록 쓰기에 걸리는 실제 시간
-- 메인 프로그램의 HTTPS 요청(WiFiSSLClient)과 동시에 쓸 때의 소켓 수 한계
+- 메인 프로그램의 HTTP 요청(WiFiClient, 포트 80)과 함께 쓸 때의 소켓 수 한계
+- 메인 스택(1 KB)을 넘는 스택 사용(`tl.loop()` 한 번 최악 약 1,200바이트, `docs/메모리_사용량.md` 2.3). 코어가 스택 감시를 꺼서 멈추지는 않지만 실제 최고 사용량은 재지 않음
 - 며칠 연속 가동
