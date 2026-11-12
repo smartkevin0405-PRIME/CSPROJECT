@@ -19,7 +19,7 @@ static uint32_t stateSince = 0;          // 지금 상태에 들어온 시각
 static State    afterMessage = ST_IDLE;  // 안내 문구가 끝난 뒤 갈 상태
 static uint32_t messageMs = 0;
 
-static WeatherInfo weather = { false, -128, 0, 255, WX_UNKNOWN };
+static WeatherInfo weather = { false, -128, 0, 255, 255, WX_UNKNOWN };
 static uint32_t    weatherAt = 0;
 static bool        weatherTried = false;
 
@@ -48,7 +48,7 @@ static uint32_t departedAt = 0;
 uint32_t hostEpochNow()  { return netEpoch(); }
 bool     hostWifiReady() { return netReady(); }
 bool     hostNetIdle()   { return !netBusy(); }
-uint8_t  hostWeatherPty(){ return weather.ok ? weather.pty : 255; }
+uint8_t  hostWeatherPty(){ return weather.ok ? weather.nowPty : 255; }   // 학습에는 지금 날씨를 쓴다
 
 static void enter(State s) {
   state = s;
@@ -111,16 +111,28 @@ static void drawRows() {
   }
 }
 
+// 조회 한 건이 끝날 때마다 부른다. 조회하는 동안에도 문 센서와 폰 통신이 멈추지 않게 한다.
+// tl.loop()는 스택을 많이 쓰므로 조회 함수(Net.cpp) 안쪽이 아니라 여기, 조회와 조회 사이에서만 부른다.
+static void betweenFetches() {
+  devicesLoop();
+  travelLoop();
+}
+
 // 등록된 사용자가 태그했을 때: 조회하고 표시한다
+// 조회 중에 문이 열렸으면 그 신호는 남아 있다가, 조회가 끝난 뒤 loop()에서 외출로 처리된다
 static void handleUser(int idx) {
   const User& u = USERS[idx];
   screenMessage("LOADING", u.name, C_CYAN);
-  if (!weatherTried || millis() - weatherAt > 60000) refreshWeather();
+  if (!weatherTried || millis() - weatherAt > 60000) {
+    refreshWeather();
+    betweenFetches();
+  }
 
   bool any = false;
   for (uint8_t i = 0; i < u.stopCount; i++) {
     arrivalOk[i] = fetchArrival(STOPS[u.stopIdx[i]], arrivals[i]);
     if (arrivalOk[i]) any = true;
+    betweenFetches();
   }
   if (!any && !weather.ok) {                 // 아무것도 못 받았으면 NO DATA
     showMessage("NO DATA", "check WiFi or API key", C_RED, 3000, ST_IDLE);
@@ -133,6 +145,7 @@ static void handleUser(int idx) {
   screenInfo(u, weather);
   drawRows();
   screenInfoCountdown(SHOW_MS / 1000);
+  screenInfoPhone(travelPhoneOnline((uint8_t)idx));
   lastTick = millis();
   enter(ST_SHOW);
 }
@@ -154,7 +167,7 @@ static void handleCard() {
 // 태그한 사람이 문을 열고 나갔다: 이동 모듈에 알린다
 static void sendDeparture() {
   const User& u = USERS[armedUser];
-  DepartureEvent ev;
+  static DepartureEvent ev;                  // 크기가 커서(약 70바이트) 1KB 메인 스택 대신 전역 영역에 둔다
   memset(&ev, 0, sizeof(ev));
   ev.seq = ++departSeq;
   ev.epochSec = netEpoch();
@@ -163,15 +176,15 @@ static void sendDeparture() {
   strncpy(ev.stopId, STOPS[u.stopIdx[0]].key, sizeof(ev.stopId) - 1);
   ev.outdoorTempC = weather.ok ? weather.tempC : -128;
   ev.sky = weather.ok ? weather.sky : 0;
-  ev.pty = weather.ok ? weather.pty : 255;
+  ev.pty = weather.ok ? weather.nowPty : 255;    // 출발 시점 날씨 (다이얼의 '앞으로 3시간'이 아님)
   ev.arrivalCount = 0;
   if (armedUser == curUser) {
     for (uint8_t i = 0; i < u.stopCount && i < TRAVEL_MAX_ARRIVALS; i++) {
       if (!arrivalOk[i]) continue;
-      TransitArrival a = arrivals[i];
+      TransitArrival& a = ev.arrivals[ev.arrivalCount++];
+      a = arrivals[i];
       a.etaSec[0] = etaNow(a.etaSec[0]);
       a.etaSec[1] = etaNow(a.etaSec[1]);
-      ev.arrivals[ev.arrivalCount++] = a;
     }
   }
   travelOnDeparture(ev);
@@ -197,6 +210,7 @@ void setup() {
 
 void loop() {
   devicesLoop();
+  netLoop();                                   // WiFi가 끊겼으면 다시 연결
   travelLoop();
   uint32_t now = millis();
 
@@ -238,6 +252,7 @@ void loop() {
         lastTick = now;
         drawRows();
         screenInfoCountdown((uint16_t)((SHOW_MS - (now - stateSince)) / 1000));
+        screenInfoPhone(travelPhoneOnline((uint8_t)curUser));   // 보는 동안 폰이 연결되면 바뀐다
       }
       break;
 

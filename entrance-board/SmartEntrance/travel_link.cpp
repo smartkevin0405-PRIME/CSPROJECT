@@ -1,6 +1,7 @@
 // travel_link.cpp
 // travel_iface.h의 약속을 실제 이동 시간 모듈(TravelLearn 라이브러리)로 연결한다.
-// config.h의 USE_TRAVEL_STUB가 0일 때 쓰인다. 1이면 travel_stub.cpp(240초 고정)가 대신 쓰인다.
+// config.h의 DEMO_MODE와 USE_TRAVEL_STUB가 둘 다 0일 때(실제 조회 모드) 쓰인다.
+// 그 밖에는 travel_stub.cpp(240초 고정)가 대신 쓰인다.
 // 라이브러리 위치: ../../travel-learn/arduino/TravelLearn (Arduino 라이브러리 폴더에 복사해 둔다)
 // [생성형 AI 활용] 이 파일은 Claude의 도움을 받아 작성했다.
 #include "config.h"
@@ -33,6 +34,7 @@ static uint8_t timeBand(uint32_t epoch) {
   return TravelLearn::tbFromHour((int)(local / 3600L));
 }
 
+// 출발 신호 전달 결과. 결과는 tl.phoneOnline()에도 남아 정보 화면의 PHONE OK / PHONE --로 보인다
 static void onDepartResult(uint8_t user, uint32_t trip, bool delivered) {
   Serial.print(F("[travel] depart user="));
   Serial.print(user);
@@ -103,5 +105,6 @@ int16_t travelGetSlackSec(uint8_t userId, const char* stopId, uint16_t etaSec) {
   return (int16_t)r.slackS;
 }
 
+// 정보 화면의 폰 연결 표시에 쓴다. 보드를 켠 뒤 폰이 hello를 보내기 전(최대 60분)에는 false
 bool travelPhoneOnline(uint8_t userId) { return tl.phoneOnline(userId + 1); }
 #endif

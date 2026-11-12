@@ -24,7 +24,7 @@ struct DepartureEvent {
   char     stopId[12];    // 설정표의 정류장 키
   int8_t   outdoorTempC;  // 출발 당시 외부 기온. 모르면 -128
   uint8_t  sky;           // 기상청 SKY 코드. 모르면 0
-  uint8_t  pty;           // 기상청 PTY 코드. 모르면 255
+  uint8_t  pty;           // 출발 시점의 기상청 PTY 코드(가장 가까운 예보 시각). 모르면 255
   uint8_t  arrivalCount;  // 0~TRAVEL_MAX_ARRIVALS
   TransitArrival arrivals[TRAVEL_MAX_ARRIVALS];
 };
@@ -42,4 +42,4 @@ bool     travelPhoneOnline(uint8_t userId);     // 그 사람 폰과 최근 연�
 uint32_t hostEpochNow();
 bool     hostWifiReady();
 bool     hostNetIdle();
-uint8_t  hostWeatherPty();   // 지금 날씨의 기상청 PTY 코드. 모르면 255
+uint8_t  hostWeatherPty();   // 지금 날씨(가장 가까운 예보 시각)의 기상청 PTY 코드. 모르면 255

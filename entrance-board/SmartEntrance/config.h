@@ -8,6 +8,13 @@
 #define DEMO_MODE        1   // 1: WiFi와 API 없이 가짜 데이터로 동작 (부품·키가 오기 전 개발용)
 #define USE_TRAVEL_STUB  0   // 0: 실제 이동 시간 모듈(TravelLearn 라이브러리) 사용, 1: 240초 고정 스텁
 
+// 데모 모드는 WiFi를 연결하지 않으므로 폰과 통신할 수 없다. 그래서 이동 시간 모듈도 스텁을 쓴다.
+// (데모만 돌릴 때는 TravelLearn 라이브러리를 설치하지 않아도 된다)
+#if DEMO_MODE
+#undef  USE_TRAVEL_STUB
+#define USE_TRAVEL_STUB  1
+#endif
+
 // ---------- 핀 (설계 문서 2절과 같다) ----------
 const uint8_t PIN_DOOR     = 2;   // 문 열림 센서 MC-38
 const uint8_t PIN_SERVO    = 3;   // 날씨 다이얼 서보
@@ -36,6 +43,7 @@ const uint32_t DEPART_WINDOW_MS = 120000;  // 태그 후 이 안에 문이 열�
 const uint32_t IDLE_SENSOR_MS   = 5000;    // 실내 온습도 측정 간격
 const uint32_t WEATHER_MS       = 600000;  // 날씨 갱신 간격
 const uint32_t CANCEL_WINDOW_MS = 90000;   // 출발 후 이 안에 같은 사람이 다시 태그하면 외출 취소
+const uint32_t HTTP_TIMEOUT_MS  = 8000;    // API 요청 1건(연결부터 응답 끝까지) 전체 제한 시간
 
 // ---------- 날씨 다이얼 각도 ----------
 enum WeatherKind : uint8_t { WX_SUNNY = 0, WX_CLOUDY = 1, WX_RAIN = 2, WX_SNOW = 3, WX_UNKNOWN = 4 };
@@ -47,7 +55,7 @@ const int KMA_NY = 125;
 
 // ---------- 정류장 ----------
 struct Stop {
-  const char* key;     // 이동 모듈과 공유하는 키
+  const char* key;     // 메인 코드 안에서 정류장을 가리키는 이름(정류장마다 다르게). 이동 모듈에는 넘기지 않는다
   TransitMode mode;
   const char* label;   // 화면에 보일 이름 (영문·숫자)
   const char* query;   // 버스: 정류소 번호(ARS 5자리) / 지하철: URL 인코딩한 역 이름
@@ -57,7 +65,9 @@ struct Stop {
 };
 
 // 아래 정류장과 사용자 값은 예시다. 실제 값으로 바꾼다.
-// 이동 시간 모듈은 정류장 4곳, 사용자 4명까지 다룬다. 배열 위치가 곧 번호다(앞에서부터 1번). 순서를 바꾸면 학습 기록이 엉킨다.
+// 이동 시간 모듈은 정류장 4곳, 사용자 4명까지 다룬다. 모듈과 폰 앱의 번호는 배열 위치+1이다(앞에서부터 1번).
+//  - STOPS의 n번째 = 폰 앱 "3. 정류장"의 정류장 n,  USERS의 n번째 = 폰 앱 "2. 현관판 연결"의 사용자 번호 n
+//  - 학습을 시작한 뒤 순서를 바꾸면 이미 쌓인 기록이 다른 정류장·사람의 기록과 섞인다. 새 항목은 맨 뒤에 붙인다.
 const Stop STOPS[] = {
   { "21252", MODE_BUS,    "BUS 5511",  "21252",                 "5511", "",     300 },
   { "S0230", MODE_SUBWAY, "SILLIM L2", "%EC%8B%A0%EB%A6%BC",    "1002", "내선", 420 },

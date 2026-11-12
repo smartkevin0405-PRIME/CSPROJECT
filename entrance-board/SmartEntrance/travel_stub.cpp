@@ -1,5 +1,6 @@
 // travel_stub.cpp
-// 이동 시간 모듈이 완성되기 전까지 쓰는 가짜 구현. 이동 시간을 240초로 고정한다.
+// 이동 시간 모듈의 가짜 구현. 이동 시간을 240초로 고정한다.
+// 데모 모드(DEMO_MODE 1)이거나 USE_TRAVEL_STUB 1일 때 쓰인다.
 // [생성형 AI 활용] 이 파일은 Claude의 도움을 받아 작성했다.
 #include "config.h"
 #if USE_TRAVEL_STUB

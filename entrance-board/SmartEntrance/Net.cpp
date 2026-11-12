@@ -3,6 +3,7 @@
 // 보드 RAM이 32KB라서 10KB가 넘는 응답을 버퍼에 담지 않기 위해서다.
 // [생성형 AI 활용] 이 파일은 Claude의 도움을 받아 작성했다.
 #include "Net.h"
+#include "Devices.h"
 #include "secrets.h"
 
 static bool busy = false;
@@ -32,6 +33,7 @@ static void insertEta(TransitArrival& a, uint16_t eta) {
 #if DEMO_MODE
 // ---------------- 가짜 데이터 (WiFi 없이 화면과 흐름을 개발할 때) ----------------
 bool netBegin() { return true; }
+void netLoop() {}
 bool netReady() { return true; }
 uint32_t netEpoch() { return 0; }
 
@@ -42,6 +44,7 @@ bool fetchWeather(WeatherInfo& out) {
   out.tempC = 12;
   out.sky = (out.kind == WX_SUNNY) ? 1 : 4;
   out.pty = (out.kind == WX_RAIN) ? 1 : (out.kind == WX_SNOW ? 3 : 0);
+  out.nowPty = out.pty;
   return true;
 }
 
@@ -61,27 +64,58 @@ bool fetchArrival(const Stop& stop, TransitArrival& out) {
 
 bool netBegin() {
   if (WiFi.status() == WL_NO_MODULE) return false;
+  WiFi.setTimeout(0);                 // WiFi.begin()이 연결을 기다리지 않고 바로 돌아오게 한다 (기본은 10초 대기)
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) delay(250);
   return WiFi.status() == WL_CONNECTED;
 }
+
+// 공유기가 다시 켜지는 등으로 연결이 끊기면, 끊긴 채로 30초가 지날 때마다 연결을 다시 시작한다.
+// WiFi.begin()은 연결 명령만 보내고 바로 돌아오므로 loop()를 오래 막지 않는다.
+// 이동 시간 모듈의 서버(8080)는 재연결 뒤 다시 열 필요가 없다 (README의 "Wi-Fi 재연결" 참고).
+void netLoop() {
+  static uint32_t checkedAt = 0;      // 마지막으로 상태를 확인한 시각
+  static uint32_t waitFrom = 0;       // 연결돼 있던 마지막 시각 또는 마지막 재연결 시도 시각
+  uint32_t now = millis();
+  if (now - checkedAt < 1000) return; // 상태 확인은 1초에 한 번만
+  checkedAt = now;
+  if (netReady()) { waitFrom = now; return; }
+  if (now - waitFrom < 30000) return; // 아직 30초가 안 됐다
+  waitFrom = now;
+  Serial.println(F("WiFi lost, reconnecting"));
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+}
+
 bool netReady() { return WiFi.status() == WL_CONNECTED; }
 uint32_t netEpoch() { return netReady() ? (uint32_t)WiFi.getTime() : 0; }
 
-// 한 글자를 읽는다. 4초 동안 안 오거나 연결이 끝나면 -1
+static uint32_t reqStart = 0;            // 지금 요청을 시작한 시각 (httpOpen에서 정한다)
+
+// ---- 세 조회 함수가 같이 쓰는 버퍼 ----
+// 메인 스택은 1KB뿐이다(UNO R4 코어 설정). 그런데 WiFiClient 연결과 snprintf가 그 아래에서
+// 약 600바이트를 쓰므로, 큰 버퍼는 함수 안(스택)이 아니라 여기(전역 영역)에 하나씩만 둔다.
+// 조회는 한 번에 한 건씩만 하므로 같이 써도 겹치지 않는다.
+static char reqPath[320];                // 요청 경로(URL)
+static char fieldName[16];               // JSON 키 또는 XML 태그 이름
+static char fieldText[48];               // JSON 값 또는 XML 글자
+
+// 한 글자를 읽는다. 요청 전체 제한 시간(HTTP_TIMEOUT_MS)이 지났거나 연결이 끝나면 -1
+// 기다리는 동안에도 문 센서를 읽어서, 조회 중에 문이 열려도 놓치지 않게 한다
 static int readCh(WiFiClient& c) {
-  uint32_t start = millis();
-  while (!c.available()) {
-    if (!c.connected() || millis() - start > 4000) return -1;
+  for (;;) {
+    devicesLoop();
+    if (millis() - reqStart > HTTP_TIMEOUT_MS) return -1;
+    if (c.available()) return c.read();
+    if (!c.connected()) return -1;
     delay(1);
   }
-  return c.read();
 }
 
 // GET 요청을 보내고 응답 헤더를 건너뛴다. 상태 코드가 200이면 true
 // HTTP/1.0으로 요청해서 본문이 조각(chunked)으로 나뉘어 오지 않게 한다
 static bool httpOpen(WiFiClient& c, const char* host, const char* path) {
+  reqStart = millis();                   // 여기서부터 HTTP_TIMEOUT_MS 안에 끝나야 한다
   if (!c.connect(host, 80)) return false;
   c.print(F("GET "));
   c.print(path);
@@ -228,15 +262,14 @@ static void kstDate(uint32_t epoch, int& y, int& m, int& d, int& hour) {
 }
 
 bool fetchWeather(WeatherInfo& out) {
-  out.ok = false; out.tempC = -128; out.sky = 0; out.pty = 255; out.kind = WX_UNKNOWN;
+  out.ok = false; out.tempC = -128; out.sky = 0; out.pty = 255; out.nowPty = 255; out.kind = WX_UNKNOWN;
   uint32_t now = netEpoch();
   if (now < 1600000000UL) return false;                  // 시각을 아직 못 받았다
 
   // 초단기예보는 매시 30분에 만들어져 45분쯤부터 조회된다
   int y, m, d, hour;
   kstDate(now - 45UL * 60UL, y, m, d, hour);
-  char path[320];
-  snprintf(path, sizeof(path),
+  snprintf(reqPath, sizeof(reqPath),
            "/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst?serviceKey=%s&numOfRows=60&pageNo=1"
            "&dataType=JSON&base_date=%04d%02d%02d&base_time=%02d30&nx=%d&ny=%d",
            KEY_DATA_GO_KR, y, m, d, hour, KMA_NX, KMA_NY);
@@ -244,12 +277,14 @@ bool fetchWeather(WeatherInfo& out) {
   busy = true;
   WiFiClient client;
   bool gotTemp = false, gotSky = false, rain = false, snow = false;
-  uint8_t nPty = 0, nSky = 0, nT1h = 0, maxSky = 0, firstPty = 0;
-  if (httpOpen(client, "apis.data.go.kr", path)) {
+  uint8_t nPty = 0, nSky = 0, nT1h = 0, maxSky = 0, firstPty = 0, nowPty = 255;
+  if (httpOpen(client, "apis.data.go.kr", reqPath)) {
     JsonScan scan(client);
-    char key[12], val[16], cat[4] = "", fval[8] = "";
+    char* key = fieldName;
+    char* val = fieldText;
+    char cat[4] = "", fval[8] = "";
     for (;;) {
-      ScanResult r = scan.next(key, sizeof(key), val, sizeof(val));
+      ScanResult r = scan.next(key, sizeof(fieldName), val, sizeof(fieldText));
       if (r == SCAN_EOF) break;
       if (r == SCAN_PAIR) {
         if (strcmp(key, "category") == 0) { strncpy(cat, val, 3); cat[3] = 0; }
@@ -259,7 +294,9 @@ bool fetchWeather(WeatherInfo& out) {
       // 예보 한 건이 끝났다. 같은 항목은 가까운 시각부터 차례로 온다
       if (cat[0] != 0) {
         int v = atoi(fval);
-        if (strcmp(cat, "PTY") == 0 && nPty++ < 3) {
+        if (strcmp(cat, "PTY") == 0 && nPty < 3) {
+          if (nPty == 0) nowPty = (uint8_t)v;               // 첫 PTY = 가장 가까운 예보 시각 (학습용)
+          nPty++;
           if (v == 1 || v == 2 || v == 5 || v == 6) rain = true;
           if (v == 3 || v == 7) snow = true;
           if (firstPty == 0) firstPty = (uint8_t)v;
@@ -280,6 +317,7 @@ bool fetchWeather(WeatherInfo& out) {
   if (!gotTemp || !gotSky) return false;
   out.sky = maxSky;
   out.pty = firstPty;
+  out.nowPty = nowPty;
   if (rain) out.kind = WX_RAIN;
   else if (snow) out.kind = WX_SNOW;
   else if (maxSky >= 3) out.kind = WX_CLOUDY;
@@ -289,17 +327,19 @@ bool fetchWeather(WeatherInfo& out) {
 }
 
 static bool fetchBus(const Stop& stop, TransitArrival& out) {
-  char path[256];
-  snprintf(path, sizeof(path), "/api/rest/stationinfo/getStationByUid?serviceKey=%s&arsId=%s",
+  snprintf(reqPath, sizeof(reqPath), "/api/rest/stationinfo/getStationByUid?serviceKey=%s&arsId=%s",
            KEY_DATA_GO_KR, stop.query);
   WiFiClient client;
   bool found = false;
-  if (httpOpen(client, "ws.bus.go.kr", path)) {
+  if (httpOpen(client, "ws.bus.go.kr", reqPath)) {
     XmlScan scan(client);
-    char tag[16], text[48];
-    char rt[12] = "", adir[40] = "", msg1[48] = "", msg2[48] = "";
+    char* tag = fieldName;
+    char* text = fieldText;
+    // 노선 하나의 값. static이라 스택이 아니라 전역 영역에 있고, 지난 값이 남아 있으므로 먼저 비운다
+    static char rt[12], adir[40], msg1[48], msg2[48];
+    rt[0] = 0; adir[0] = 0; msg1[0] = 0; msg2[0] = 0;
     for (;;) {
-      ScanResult r = scan.next("itemList", tag, sizeof(tag), text, sizeof(text));
+      ScanResult r = scan.next("itemList", tag, sizeof(fieldName), text, sizeof(fieldText));
       if (r == SCAN_EOF) break;
       if (r == SCAN_PAIR) {
         if (strcmp(tag, "rtNm") == 0)            { strncpy(rt, text, sizeof(rt) - 1);     rt[sizeof(rt) - 1] = 0; }
@@ -325,17 +365,19 @@ static bool fetchBus(const Stop& stop, TransitArrival& out) {
 }
 
 static bool fetchSubway(const Stop& stop, TransitArrival& out) {
-  char path[256];
-  snprintf(path, sizeof(path), "/api/subway/%s/json/realtimeStationArrival/0/8/%s",
+  snprintf(reqPath, sizeof(reqPath), "/api/subway/%s/json/realtimeStationArrival/0/8/%s",
            KEY_SEOUL_SUBWAY, stop.query);
   WiFiClient client;
   bool found = false;
-  if (httpOpen(client, "swopenapi.seoul.go.kr", path)) {
+  if (httpOpen(client, "swopenapi.seoul.go.kr", reqPath)) {
     JsonScan scan(client);
-    char key[16], val[48];
-    char line[8] = "", updn[16] = "", barvl[8] = "", msg[48] = "", cd[4] = "";
+    char* key = fieldName;
+    char* val = fieldText;
+    // 열차 한 대의 값. static이라 스택이 아니라 전역 영역에 있고, 지난 값이 남아 있으므로 먼저 비운다
+    static char line[8], updn[16], barvl[8], msg[48], cd[4];
+    line[0] = 0; updn[0] = 0; barvl[0] = 0; msg[0] = 0; cd[0] = 0;
     for (;;) {
-      ScanResult r = scan.next(key, sizeof(key), val, sizeof(val));
+      ScanResult r = scan.next(key, sizeof(fieldName), val, sizeof(fieldText));
       if (r == SCAN_EOF) break;
       if (r == SCAN_PAIR) {
         if (strcmp(key, "subwayId") == 0)      { strncpy(line, val, sizeof(line) - 1);   line[sizeof(line) - 1] = 0; }
