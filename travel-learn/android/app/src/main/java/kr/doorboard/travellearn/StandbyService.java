@@ -164,8 +164,9 @@ public class StandbyService extends Service
             stopStandby();
             return START_NOT_STICKY;
         }
-        if (!ensureForeground()) {
-            // 백그라운드에서 포그라운드 서비스 시작이 거부된 경우(배터리 "제한 없음"이 아닐 때 생길 수 있음)
+        if (!started && !ensureForeground()) {
+            // 백그라운드에서 포그라운드 서비스 시작이 거부된 경우(배터리 "제한 없음"이 아닐 때 생길 수 있음).
+            // 이미 실행 중일 때는 다시 부르지 않는다: 측정 중에 들어온 알람·버튼 때문에 서비스가 멈추면 안 된다.
             stopSelf();
             return START_NOT_STICKY;
         }
