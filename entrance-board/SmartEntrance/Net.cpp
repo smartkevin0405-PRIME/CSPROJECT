@@ -3,6 +3,7 @@
 // 보드 RAM이 32KB라서 10KB가 넘는 응답을 버퍼에 담지 않기 위해서다.
 // [생성형 AI 활용] 이 파일은 Claude의 도움을 받아 작성했다.
 #include "Net.h"
+#include "Devices.h"
 #include "secrets.h"
 
 static bool busy = false;
@@ -88,19 +89,24 @@ void netLoop() {
 bool netReady() { return WiFi.status() == WL_CONNECTED; }
 uint32_t netEpoch() { return netReady() ? (uint32_t)WiFi.getTime() : 0; }
 
-// 한 글자를 읽는다. 4초 동안 안 오거나 연결이 끝나면 -1
+static uint32_t reqStart = 0;            // 지금 요청을 시작한 시각 (httpOpen에서 정한다)
+
+// 한 글자를 읽는다. 요청 전체 제한 시간(HTTP_TIMEOUT_MS)이 지났거나 연결이 끝나면 -1
+// 기다리는 동안에도 문 센서를 읽어서, 조회 중에 문이 열려도 놓치지 않게 한다
 static int readCh(WiFiClient& c) {
-  uint32_t start = millis();
-  while (!c.available()) {
-    if (!c.connected() || millis() - start > 4000) return -1;
+  for (;;) {
+    devicesLoop();
+    if (millis() - reqStart > HTTP_TIMEOUT_MS) return -1;
+    if (c.available()) return c.read();
+    if (!c.connected()) return -1;
     delay(1);
   }
-  return c.read();
 }
 
 // GET 요청을 보내고 응답 헤더를 건너뛴다. 상태 코드가 200이면 true
 // HTTP/1.0으로 요청해서 본문이 조각(chunked)으로 나뉘어 오지 않게 한다
 static bool httpOpen(WiFiClient& c, const char* host, const char* path) {
+  reqStart = millis();                   // 여기서부터 HTTP_TIMEOUT_MS 안에 끝나야 한다
   if (!c.connect(host, 80)) return false;
   c.print(F("GET "));
   c.print(path);

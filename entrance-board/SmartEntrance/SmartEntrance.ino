@@ -111,16 +111,28 @@ static void drawRows() {
   }
 }
 
+// 조회 한 건이 끝날 때마다 부른다. 조회하는 동안에도 문 센서와 폰 통신이 멈추지 않게 한다.
+// tl.loop()는 스택을 많이 쓰므로 조회 함수(Net.cpp) 안쪽이 아니라 여기, 조회와 조회 사이에서만 부른다.
+static void betweenFetches() {
+  devicesLoop();
+  travelLoop();
+}
+
 // 등록된 사용자가 태그했을 때: 조회하고 표시한다
+// 조회 중에 문이 열렸으면 그 신호는 남아 있다가, 조회가 끝난 뒤 loop()에서 외출로 처리된다
 static void handleUser(int idx) {
   const User& u = USERS[idx];
   screenMessage("LOADING", u.name, C_CYAN);
-  if (!weatherTried || millis() - weatherAt > 60000) refreshWeather();
+  if (!weatherTried || millis() - weatherAt > 60000) {
+    refreshWeather();
+    betweenFetches();
+  }
 
   bool any = false;
   for (uint8_t i = 0; i < u.stopCount; i++) {
     arrivalOk[i] = fetchArrival(STOPS[u.stopIdx[i]], arrivals[i]);
     if (arrivalOk[i]) any = true;
+    betweenFetches();
   }
   if (!any && !weather.ok) {                 // 아무것도 못 받았으면 NO DATA
     showMessage("NO DATA", "check WiFi or API key", C_RED, 3000, ST_IDLE);

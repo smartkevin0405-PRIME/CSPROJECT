@@ -43,6 +43,7 @@ const uint32_t DEPART_WINDOW_MS = 120000;  // 태그 후 이 안에 문이 열�
 const uint32_t IDLE_SENSOR_MS   = 5000;    // 실내 온습도 측정 간격
 const uint32_t WEATHER_MS       = 600000;  // 날씨 갱신 간격
 const uint32_t CANCEL_WINDOW_MS = 90000;   // 출발 후 이 안에 같은 사람이 다시 태그하면 외출 취소
+const uint32_t HTTP_TIMEOUT_MS  = 8000;    // API 요청 1건(연결부터 응답 끝까지) 전체 제한 시간
 
 // ---------- 날씨 다이얼 각도 ----------
 enum WeatherKind : uint8_t { WX_SUNNY = 0, WX_CLOUDY = 1, WX_RAIN = 2, WX_SNOW = 3, WX_UNKNOWN = 4 };
