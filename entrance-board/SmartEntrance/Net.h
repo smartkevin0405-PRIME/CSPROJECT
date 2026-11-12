@@ -13,6 +13,7 @@ struct WeatherInfo {
 };
 
 bool     netBegin();                    // WiFi 연결 (최대 15초 기다림)
+void     netLoop();                     // loop()마다 호출. 끊긴 채로 30초가 지나면 다시 연결을 시작한다
 bool     netReady();                    // 연결돼 있으면 true
 uint32_t netEpoch();                    // 현재 시각 (UTC 초). 모르면 0
 bool     netBusy();                     // API 조회 중이면 true

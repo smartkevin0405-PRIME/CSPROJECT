@@ -32,6 +32,7 @@ static void insertEta(TransitArrival& a, uint16_t eta) {
 #if DEMO_MODE
 // ---------------- 가짜 데이터 (WiFi 없이 화면과 흐름을 개발할 때) ----------------
 bool netBegin() { return true; }
+void netLoop() {}
 bool netReady() { return true; }
 uint32_t netEpoch() { return 0; }
 
@@ -61,11 +62,29 @@ bool fetchArrival(const Stop& stop, TransitArrival& out) {
 
 bool netBegin() {
   if (WiFi.status() == WL_NO_MODULE) return false;
+  WiFi.setTimeout(0);                 // WiFi.begin()이 연결을 기다리지 않고 바로 돌아오게 한다 (기본은 10초 대기)
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) delay(250);
   return WiFi.status() == WL_CONNECTED;
 }
+
+// 공유기가 다시 켜지는 등으로 연결이 끊기면, 끊긴 채로 30초가 지날 때마다 연결을 다시 시작한다.
+// WiFi.begin()은 연결 명령만 보내고 바로 돌아오므로 loop()를 오래 막지 않는다.
+// 이동 시간 모듈의 서버(8080)는 재연결 뒤 다시 열 필요가 없다 (README의 "Wi-Fi 재연결" 참고).
+void netLoop() {
+  static uint32_t checkedAt = 0;      // 마지막으로 상태를 확인한 시각
+  static uint32_t waitFrom = 0;       // 연결돼 있던 마지막 시각 또는 마지막 재연결 시도 시각
+  uint32_t now = millis();
+  if (now - checkedAt < 1000) return; // 상태 확인은 1초에 한 번만
+  checkedAt = now;
+  if (netReady()) { waitFrom = now; return; }
+  if (now - waitFrom < 30000) return; // 아직 30초가 안 됐다
+  waitFrom = now;
+  Serial.println(F("WiFi lost, reconnecting"));
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+}
+
 bool netReady() { return WiFi.status() == WL_CONNECTED; }
 uint32_t netEpoch() { return netReady() ? (uint32_t)WiFi.getTime() : 0; }
 

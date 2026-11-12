@@ -197,6 +197,7 @@ void setup() {
 
 void loop() {
   devicesLoop();
+  netLoop();                                   // WiFi가 끊겼으면 다시 연결
   travelLoop();
   uint32_t now = millis();
 

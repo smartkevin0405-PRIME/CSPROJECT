@@ -17,6 +17,15 @@ config.h의 `DEMO_MODE`가 1이면 WiFi와 API 키 없이 가짜 데이터로 �
 2. config.h에서 `DEMO_MODE`를 0으로, 기상청 격자(KMA_NX, KMA_NY), 정류장(STOPS), 사용자(USERS)를 실제 값으로 바꾼다
 3. 카드 UID는 시리얼 모니터(115200)에 찍히는 "UID: .." 값을 USERS에 옮겨 적는다
 
+## Wi-Fi 재연결
+- 연결이 끊긴 채로 약 30초가 지나면 `netLoop()`가 `WiFi.begin()`을 다시 부른다(이후에도 30초마다). 시리얼 모니터에 `WiFi lost, reconnecting`이 찍힌다
+- `WiFi.setTimeout(0)`으로 `WiFi.begin()`이 연결 명령만 보내고 바로 돌아오게 했다(WiFiS3 기본값은 10초 동안 기다림). 연결은 보드의 Wi-Fi 모듈(ESP32-S3)이 이어서 한다
+- 이동 시간 모듈의 서버(8080)는 재연결 뒤 다시 열지 않는다. 소스로 확인한 근거:
+  - WiFiS3의 `WiFiServer`는 Wi-Fi 모듈 안 소켓 번호만 기억한다. 모듈의 서버를 모두 닫는 명령(`_SOFTRESETWIFI`)은 처음 한 번(`modem.begin()`)과 `WiFi.end()`에서만 나간다
+  - Wi-Fi 모듈 펌웨어(uno-r4-wifi-usb-bridge)는 `WiFi.begin()` 명령을 받아도 서버 소켓을 건드리지 않는다
+  - 서버 소켓은 주소 0.0.0.0에 묶여 있고, lwIP는 IP가 바뀔 때 특정 주소에 묶인 소켓만 바꾼다
+- 실제 공유기를 껐다 켜는 시험은 아직 하지 않았다(미확인)
+
 ## 파일
 - SmartEntrance.ino: 상태 흐름 (대기 → 태그 확인 → 조회 → 표시 → 복귀)
 - config.h: 핀, 시간, User 클래스와 사용자·정류장 배열, 순차 탐색
