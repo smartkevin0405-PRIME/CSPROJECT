@@ -75,7 +75,7 @@ Arduino IDE는 GCC 7.2.1을 쓰므로 수백 바이트 다를 수 있다. **실�
 ## 다음 할 일
 
 1. 부품 주문 (화면 THL-CD07은 해외 상품이라 약 일주일)
-2. `secrets.h`에 WiFi와 API 키, `config.h`에 실제 정류장·사용자 UID·기상청 격자 입력
+2. `secrets.h.example`을 `secrets.h`로 복사해 WiFi와 API 키 입력, `config.h`에 실제 정류장·사용자 UID·기상청 격자 입력
 3. 부품 도착 후 화면 단독 시험 → 전체 배선 → 데모 모드 → 실제 조회 순서로 확인
 4. 이동 시간 모듈과 합친 상태로 보드 컴파일, RAM 사용량 재측정, `secrets.h`의 `TL_KEY_USER*`에 실제 키 입력
 
@@ -117,5 +117,5 @@ Arduino IDE는 GCC 7.2.1을 쓰므로 수백 바이트 다를 수 있다. **실�
 
 ## 주의
 
-- `secrets.h`에 실제 키를 넣은 뒤에는 그 파일을 올리지 않는다.
+- 저장소에는 `SmartEntrance/secrets.h.example`만 있다. 복사해서 만든 `secrets.h`는 `.gitignore`에 있어 올라가지 않는다. 실제 키는 예시 파일에 쓰지 않는다.
 - 코드 파일마다 생성형 AI(Claude) 활용 사실을 주석으로 적어 두었다.
