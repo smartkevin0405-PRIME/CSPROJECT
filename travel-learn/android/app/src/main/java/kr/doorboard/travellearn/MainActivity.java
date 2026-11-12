@@ -588,7 +588,7 @@ public class MainActivity extends Activity {
                 .append(Build.VERSION.SDK_INT >= Perms.API_37 ? "" : " — 이 버전에서는 불필요").append('\n');
         sb.append(mark(Perms.batteryUnrestricted(this))).append("배터리 '제한 없음'\n");
         sb.append(mark(Perms.locationEnabled(this))).append("기기 위치 켜짐\n");
-        sb.append("  삼성: 설정 > 배터리 > 백그라운드 사용 제한에서 이 앱을 '절전 예외 앱'에 추가");
+        sb.append("  삼성: 설정 > 배터리 > 백그라운드 사용 제한에서 이 앱을 '자동 절전 예외 앱'에 추가");
         setupView.setText(sb.toString());
 
         StringBuilder tb = new StringBuilder();

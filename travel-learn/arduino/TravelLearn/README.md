@@ -109,7 +109,8 @@ cd extras/host && ./build.sh test
 
 ## 실제 보드에서 아직 확인하지 못한 것
 
-- 실제 UNO R4 WiFi용 컴파일(arduino-cli/IDE)은 이 환경에서 못 함 — 호스트(g++) 빌드와 시험만 통과
+- Arduino IDE/arduino-cli로 컴파일해 보지 못함. 대신 공식 코어 소스(ArduinoCore-renesas)와 ARM GCC 13.2로 라이브러리와 예제 두 개를 컴파일·링크하는 데까지 확인(`extras/realcore/build_real.sh`). 공식 도구는 GCC 7.2.1이라 IDE에서 한 번 더 확인 필요
+- 보드에 올려 실행해 보지 못함 — 동작 검증은 호스트(g++) 빌드의 단위 시험과 종단 시험으로만 함
 - WiFiS3 connect()의 실제 차단 시간
 - EEPROM 블록 쓰기에 걸리는 실제 시간
 - 메인 프로그램의 HTTPS 요청(WiFiSSLClient)과 동시에 쓸 때의 소켓 수 한계

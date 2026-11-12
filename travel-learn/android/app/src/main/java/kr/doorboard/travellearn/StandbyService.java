@@ -121,7 +121,7 @@ public class StandbyService extends Service
     private boolean started;
     private boolean locating;
     private boolean fgsLocation;
-    private int retryIdx;
+    private volatile int retryIdx;
     private double lastLat;
     private double lastLon;
     private float lastAcc = 999f;
@@ -195,6 +195,7 @@ public class StandbyService extends Service
         } else if (ACTION_SYNC.equals(a)) {
             requestHelloSync("수동 동기화");
         } else if (ACTION_KEEPALIVE.equals(a)) {
+            retryIdx = 0;
             scheduleKeepalive();
             requestHelloSync("주기 점검");
         }
@@ -721,6 +722,7 @@ public class StandbyService extends Service
         @Override
         public void onAvailable(Network network) {
             wifiNet = network;
+            retryIdx = 0; // 새로 연결됐으니 재시도 간격을 처음부터
             EventLog.add(StandbyService.this, "Wi-Fi 연결됨");
             worker.postDelayed(new Runnable() {
                 @Override
