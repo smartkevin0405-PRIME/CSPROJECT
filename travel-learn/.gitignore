@@ -1,0 +1,14 @@
+# 빌드 산출물과 개인 설정은 올리지 않는다
+android/build-manual/
+android/coretest/out/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+arduino/TravelLearn/extras/host/build/
+**/arduino_secrets.h
+__pycache__/
+*.jks
+*.idsig
+virtual_board_state.json
+virtual_phone_state.json

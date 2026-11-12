@@ -1,0 +1,5 @@
+// 생성형 AI(Claude)의 도움을 받아 작성함.
+// Android 17(API 37)을 지원하는 AGP 9.3 이상이 필요하다. Android Studio가 더 새 버전을 권하면 올려도 된다.
+plugins {
+    id "com.android.application" version "9.3.2" apply false
+}
