@@ -92,6 +92,14 @@ uint32_t netEpoch() { return netReady() ? (uint32_t)WiFi.getTime() : 0; }
 
 static uint32_t reqStart = 0;            // 지금 요청을 시작한 시각 (httpOpen에서 정한다)
 
+// ---- 세 조회 함수가 같이 쓰는 버퍼 ----
+// 메인 스택은 1KB뿐이다(UNO R4 코어 설정). 그런데 WiFiClient 연결과 snprintf가 그 아래에서
+// 약 600바이트를 쓰므로, 큰 버퍼는 함수 안(스택)이 아니라 여기(전역 영역)에 하나씩만 둔다.
+// 조회는 한 번에 한 건씩만 하므로 같이 써도 겹치지 않는다.
+static char reqPath[320];                // 요청 경로(URL)
+static char fieldName[16];               // JSON 키 또는 XML 태그 이름
+static char fieldText[48];               // JSON 값 또는 XML 글자
+
 // 한 글자를 읽는다. 요청 전체 제한 시간(HTTP_TIMEOUT_MS)이 지났거나 연결이 끝나면 -1
 // 기다리는 동안에도 문 센서를 읽어서, 조회 중에 문이 열려도 놓치지 않게 한다
 static int readCh(WiFiClient& c) {
@@ -261,8 +269,7 @@ bool fetchWeather(WeatherInfo& out) {
   // 초단기예보는 매시 30분에 만들어져 45분쯤부터 조회된다
   int y, m, d, hour;
   kstDate(now - 45UL * 60UL, y, m, d, hour);
-  char path[320];
-  snprintf(path, sizeof(path),
+  snprintf(reqPath, sizeof(reqPath),
            "/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst?serviceKey=%s&numOfRows=60&pageNo=1"
            "&dataType=JSON&base_date=%04d%02d%02d&base_time=%02d30&nx=%d&ny=%d",
            KEY_DATA_GO_KR, y, m, d, hour, KMA_NX, KMA_NY);
@@ -271,11 +278,13 @@ bool fetchWeather(WeatherInfo& out) {
   WiFiClient client;
   bool gotTemp = false, gotSky = false, rain = false, snow = false;
   uint8_t nPty = 0, nSky = 0, nT1h = 0, maxSky = 0, firstPty = 0, nowPty = 255;
-  if (httpOpen(client, "apis.data.go.kr", path)) {
+  if (httpOpen(client, "apis.data.go.kr", reqPath)) {
     JsonScan scan(client);
-    char key[12], val[16], cat[4] = "", fval[8] = "";
+    char* key = fieldName;
+    char* val = fieldText;
+    char cat[4] = "", fval[8] = "";
     for (;;) {
-      ScanResult r = scan.next(key, sizeof(key), val, sizeof(val));
+      ScanResult r = scan.next(key, sizeof(fieldName), val, sizeof(fieldText));
       if (r == SCAN_EOF) break;
       if (r == SCAN_PAIR) {
         if (strcmp(key, "category") == 0) { strncpy(cat, val, 3); cat[3] = 0; }
@@ -318,17 +327,19 @@ bool fetchWeather(WeatherInfo& out) {
 }
 
 static bool fetchBus(const Stop& stop, TransitArrival& out) {
-  char path[256];
-  snprintf(path, sizeof(path), "/api/rest/stationinfo/getStationByUid?serviceKey=%s&arsId=%s",
+  snprintf(reqPath, sizeof(reqPath), "/api/rest/stationinfo/getStationByUid?serviceKey=%s&arsId=%s",
            KEY_DATA_GO_KR, stop.query);
   WiFiClient client;
   bool found = false;
-  if (httpOpen(client, "ws.bus.go.kr", path)) {
+  if (httpOpen(client, "ws.bus.go.kr", reqPath)) {
     XmlScan scan(client);
-    char tag[16], text[48];
-    char rt[12] = "", adir[40] = "", msg1[48] = "", msg2[48] = "";
+    char* tag = fieldName;
+    char* text = fieldText;
+    // 노선 하나의 값. static이라 스택이 아니라 전역 영역에 있고, 지난 값이 남아 있으므로 먼저 비운다
+    static char rt[12], adir[40], msg1[48], msg2[48];
+    rt[0] = 0; adir[0] = 0; msg1[0] = 0; msg2[0] = 0;
     for (;;) {
-      ScanResult r = scan.next("itemList", tag, sizeof(tag), text, sizeof(text));
+      ScanResult r = scan.next("itemList", tag, sizeof(fieldName), text, sizeof(fieldText));
       if (r == SCAN_EOF) break;
       if (r == SCAN_PAIR) {
         if (strcmp(tag, "rtNm") == 0)            { strncpy(rt, text, sizeof(rt) - 1);     rt[sizeof(rt) - 1] = 0; }
@@ -354,17 +365,19 @@ static bool fetchBus(const Stop& stop, TransitArrival& out) {
 }
 
 static bool fetchSubway(const Stop& stop, TransitArrival& out) {
-  char path[256];
-  snprintf(path, sizeof(path), "/api/subway/%s/json/realtimeStationArrival/0/8/%s",
+  snprintf(reqPath, sizeof(reqPath), "/api/subway/%s/json/realtimeStationArrival/0/8/%s",
            KEY_SEOUL_SUBWAY, stop.query);
   WiFiClient client;
   bool found = false;
-  if (httpOpen(client, "swopenapi.seoul.go.kr", path)) {
+  if (httpOpen(client, "swopenapi.seoul.go.kr", reqPath)) {
     JsonScan scan(client);
-    char key[16], val[48];
-    char line[8] = "", updn[16] = "", barvl[8] = "", msg[48] = "", cd[4] = "";
+    char* key = fieldName;
+    char* val = fieldText;
+    // 열차 한 대의 값. static이라 스택이 아니라 전역 영역에 있고, 지난 값이 남아 있으므로 먼저 비운다
+    static char line[8], updn[16], barvl[8], msg[48], cd[4];
+    line[0] = 0; updn[0] = 0; barvl[0] = 0; msg[0] = 0; cd[0] = 0;
     for (;;) {
-      ScanResult r = scan.next(key, sizeof(key), val, sizeof(val));
+      ScanResult r = scan.next(key, sizeof(fieldName), val, sizeof(fieldText));
       if (r == SCAN_EOF) break;
       if (r == SCAN_PAIR) {
         if (strcmp(key, "subwayId") == 0)      { strncpy(line, val, sizeof(line) - 1);   line[sizeof(line) - 1] = 0; }

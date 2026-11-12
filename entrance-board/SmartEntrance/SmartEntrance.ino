@@ -166,7 +166,7 @@ static void handleCard() {
 // 태그한 사람이 문을 열고 나갔다: 이동 모듈에 알린다
 static void sendDeparture() {
   const User& u = USERS[armedUser];
-  DepartureEvent ev;
+  static DepartureEvent ev;                  // 크기가 커서(약 70바이트) 1KB 메인 스택 대신 전역 영역에 둔다
   memset(&ev, 0, sizeof(ev));
   ev.seq = ++departSeq;
   ev.epochSec = netEpoch();
@@ -180,10 +180,10 @@ static void sendDeparture() {
   if (armedUser == curUser) {
     for (uint8_t i = 0; i < u.stopCount && i < TRAVEL_MAX_ARRIVALS; i++) {
       if (!arrivalOk[i]) continue;
-      TransitArrival a = arrivals[i];
+      TransitArrival& a = ev.arrivals[ev.arrivalCount++];
+      a = arrivals[i];
       a.etaSec[0] = etaNow(a.etaSec[0]);
       a.etaSec[1] = etaNow(a.etaSec[1]);
-      ev.arrivals[ev.arrivalCount++] = a;
     }
   }
   travelOnDeparture(ev);
