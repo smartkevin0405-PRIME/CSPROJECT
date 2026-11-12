@@ -1,0 +1,30 @@
+// 생성형 AI(Claude)의 도움을 받아 작성함.
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "kr.doorboard.travellearn"
+    compileSdk 37
+
+    defaultConfig {
+        applicationId "kr.doorboard.travellearn"
+        minSdk 29
+        targetSdk 37
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+// 외부 라이브러리 의존성 없음(Android 기본 API만 사용).
