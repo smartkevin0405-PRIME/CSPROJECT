@@ -145,6 +145,7 @@ static void handleUser(int idx) {
   screenInfo(u, weather);
   drawRows();
   screenInfoCountdown(SHOW_MS / 1000);
+  screenInfoPhone(travelPhoneOnline((uint8_t)idx));
   lastTick = millis();
   enter(ST_SHOW);
 }
@@ -251,6 +252,7 @@ void loop() {
         lastTick = now;
         drawRows();
         screenInfoCountdown((uint16_t)((SHOW_MS - (now - stateSince)) / 1000));
+        screenInfoPhone(travelPhoneOnline((uint8_t)curUser));   // 보는 동안 폰이 연결되면 바뀐다
       }
       break;
 

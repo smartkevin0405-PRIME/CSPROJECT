@@ -103,3 +103,11 @@ void screenInfoCountdown(uint16_t secLeft) {
   snprintf(buf, sizeof(buf), "back in %2us ", secLeft);
   text(12, 296, 2, C_GRAY, buf);
 }
+
+// 오른쪽 아래에 폰 연결 여부를 작게 쓴다. OK: 최근에 폰과 연락됨(hello 또는 출발 신호 전달 성공)
+// --: 아직 연락을 확인하지 못했거나 마지막 출발 신호 전달에 실패함
+void screenInfoPhone(bool online) {
+  int16_t x = tft.width() - 12 - 8 * 12;     // 글자 크기 2(한 글자 12픽셀)로 8글자, 오른쪽 맞춤
+  if (online) text(x, 296, 2, C_GREEN, "PHONE OK");
+  else        text(x, 296, 2, C_GRAY,  "PHONE --");
+}

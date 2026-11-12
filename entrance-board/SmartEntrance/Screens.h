@@ -18,3 +18,4 @@ void screenMessage(const char* line1, const char* line2, uint16_t color);
 void screenInfo(const User& user, const WeatherInfo& wx);                // 정보 화면의 틀
 void screenInfoRow(uint8_t row, const Stop& stop, const TransitArrival& a, bool ok, int16_t slackSec);
 void screenInfoCountdown(uint16_t secLeft);
+void screenInfoPhone(bool online);                                       // 이 사용자의 폰 연결 여부
