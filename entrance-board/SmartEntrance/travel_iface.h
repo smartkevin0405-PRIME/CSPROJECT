@@ -1,4 +1,4 @@
-// travel_iface.h  v0.1
+// travel_iface.h  v0.2 (TravelLearn 연결: 취소·폰 연결 상태·날씨 PTY 추가)
 // 메인 프로그램과 이동 시간 모듈(다른 담당) 사이의 약속.
 // [생성형 AI 활용] 이 파일은 Claude의 도움을 받아 작성했다.
 #pragma once
@@ -35,8 +35,11 @@ void     travelLoop();
 void     travelOnDeparture(const DepartureEvent& ev);
 uint16_t travelGetWalkSec(uint8_t userId, const char* stopId);
 int16_t  travelGetSlackSec(uint8_t userId, const char* stopId, uint16_t etaSec);
+void     travelOnCancel(uint8_t userId);        // 출발 직후 같은 사람이 다시 태그함
+bool     travelPhoneOnline(uint8_t userId);     // 그 사람 폰과 최근 연락이 됐는지
 
 // 메인이 구현하고 이동 모듈이 호출한다
 uint32_t hostEpochNow();
 bool     hostWifiReady();
 bool     hostNetIdle();
+uint8_t  hostWeatherPty();   // 지금 날씨의 기상청 PTY 코드. 모르면 255

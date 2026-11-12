@@ -6,7 +6,7 @@
 
 // ---------- 동작 방식 ----------
 #define DEMO_MODE        1   // 1: WiFi와 API 없이 가짜 데이터로 동작 (부품·키가 오기 전 개발용)
-#define USE_TRAVEL_STUB  1   // 1: 가상 이동 시간 스텁 사용
+#define USE_TRAVEL_STUB  0   // 0: 실제 이동 시간 모듈(TravelLearn 라이브러리) 사용, 1: 240초 고정 스텁
 
 // ---------- 핀 (설계 문서 2절과 같다) ----------
 const uint8_t PIN_DOOR     = 2;   // 문 열림 센서 MC-38
@@ -35,6 +35,7 @@ const uint32_t PROMPT_MS        = 20000;   // 태그 안내 유지 시간
 const uint32_t DEPART_WINDOW_MS = 120000;  // 태그 후 이 안에 문이 열리면 외출
 const uint32_t IDLE_SENSOR_MS   = 5000;    // 실내 온습도 측정 간격
 const uint32_t WEATHER_MS       = 600000;  // 날씨 갱신 간격
+const uint32_t CANCEL_WINDOW_MS = 90000;   // 출발 후 이 안에 같은 사람이 다시 태그하면 외출 취소
 
 // ---------- 날씨 다이얼 각도 ----------
 enum WeatherKind : uint8_t { WX_SUNNY = 0, WX_CLOUDY = 1, WX_RAIN = 2, WX_SNOW = 3, WX_UNKNOWN = 4 };
@@ -52,12 +53,14 @@ struct Stop {
   const char* query;   // 버스: 정류소 번호(ARS 5자리) / 지하철: URL 인코딩한 역 이름
   const char* route;   // 버스: 노선 번호 / 지하철: 호선 ID (2호선 = "1002")
   const char* dir;     // 버스: 방향 글자 일부, 비우면 전체 / 지하철: "상행" "하행" "내선" "외선"
+  uint16_t walkSec;    // 학습 기록이 없을 때 쓰는 집→정류장 예상 이동 시간(초)
 };
 
 // 아래 정류장과 사용자 값은 예시다. 실제 값으로 바꾼다.
+// 이동 시간 모듈은 정류장 4곳, 사용자 4명까지 다룬다. 배열 위치가 곧 번호다(앞에서부터 1번). 순서를 바꾸면 학습 기록이 엉킨다.
 const Stop STOPS[] = {
-  { "21252", MODE_BUS,    "BUS 5511",  "21252",                 "5511", ""     },
-  { "S0230", MODE_SUBWAY, "SILLIM L2", "%EC%8B%A0%EB%A6%BC",    "1002", "내선" },
+  { "21252", MODE_BUS,    "BUS 5511",  "21252",                 "5511", "",     300 },
+  { "S0230", MODE_SUBWAY, "SILLIM L2", "%EC%8B%A0%EB%A6%BC",    "1002", "내선", 420 },
 };
 const uint8_t STOP_COUNT = sizeof(STOPS) / sizeof(STOPS[0]);
 

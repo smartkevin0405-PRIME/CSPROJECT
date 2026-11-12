@@ -12,7 +12,7 @@
 | 전원·핀 배치·케이스 설계 | 초안 작성함. 부품 도착 후 실물 확인 필요 |
 | 배선도 | `docs/wiring.html` (브라우저로 열기) |
 | 메인 코드 | `SmartEntrance/`. UNO R4 WiFi 대상 컴파일 통과, 실물 동작은 미확인 |
-| 이동 시간 모듈 연결 | 아직 안 함. 지금은 240초 고정 스텁(`travel_stub.cpp`)이 연결돼 있음. 아래 "이동 시간 모듈과의 연결" 참고 |
+| 이동 시간 모듈 연결 | 연결함(`SmartEntrance/travel_link.cpp`, 2026-11-13). PC 호스트 빌드로 출발 신호·여유 시간 계산 호출만 확인. 보드 컴파일·실물은 미확인. `config.h`의 `USE_TRAVEL_STUB 1`이면 예전 240초 스텁으로 돌아감 |
 
 ## 폴더
 
@@ -38,12 +38,19 @@
 1. 부품 주문 (화면 THL-CD07은 해외 상품이라 약 일주일)
 2. `secrets.h`에 WiFi와 API 키, `config.h`에 실제 정류장·사용자 UID·기상청 격자 입력
 3. 부품 도착 후 화면 단독 시험 → 전체 배선 → 데모 모드 → 실제 조회 순서로 확인
-4. 이동 시간 모듈 연결: 스텁 대신 `TravelLearn` 라이브러리를 부르는 연결 파일 작성
+4. 이동 시간 모듈과 합친 상태로 보드 컴파일, RAM 사용량 재측정, `secrets.h`의 `TL_KEY_USER*`에 실제 키 입력
 
 ## 이동 시간 모듈과의 연결
 
-`../travel-learn/arduino/TravelLearn`이 실제 모듈이다. 이 폴더의 `SmartEntrance/travel_iface.h`는 그 모듈을 보기 전에 쓴 초안이라 함수 모양이 다르다.
-메인 코드는 그대로 두고, `travel_stub.cpp` 자리에 아래처럼 값을 바꿔 `TravelLearn`을 부르는 연결 파일을 넣으면 된다.
+`../travel-learn/arduino/TravelLearn`이 실제 모듈이고, `SmartEntrance/travel_link.cpp`가 메인 코드의 약속(`travel_iface.h` v0.2)을 이 모듈로 바꿔 부른다. 값은 아래처럼 바꾼다.
+
+추가로 바뀐 점
+
+- `travel_iface.h`에 `travelOnCancel`(출발 후 90초 안에 같은 사람이 다시 태그하면 외출 취소, 화면에 TRIP CANCELED), `travelPhoneOnline`, `hostWeatherPty`를 더했다.
+- `config.h`의 `Stop`에 `walkSec`(학습 기록이 없을 때의 예상 이동 시간)을 더했다. 정류장·사용자 배열 순서가 곧 모듈의 번호이므로 학습을 시작한 뒤에는 순서를 바꾸지 않는다.
+- 출발 신호의 정류장은 0(모름)으로 보낸다. 폰이 그 사용자의 정류장을 모두 감시한다.
+- 시간대는 보드 시각(`WiFi.getTime()`)으로 정하고, 없으면 폰이 hello로 알려 준 시각을 쓴다.
+- 전달 결과와 기록 저장은 시리얼 모니터에 `[travel]`로 찍힌다. 화면의 폰 연결 아이콘은 아직 없다.
 
 | 메인 코드의 값 | TravelLearn에 넘길 값 |
 | --- | --- |

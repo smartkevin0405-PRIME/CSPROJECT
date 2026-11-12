@@ -40,10 +40,15 @@ static int      armedUser = -1;
 static uint32_t armedAt = 0;
 static uint32_t departSeq = 0;
 
+// 외출 취소 판단용: 마지막으로 출발 신호를 보낸 사람과 시각
+static int      departedUser = -1;
+static uint32_t departedAt = 0;
+
 // ---- 이동 모듈이 부르는 함수 ----
 uint32_t hostEpochNow()  { return netEpoch(); }
 bool     hostWifiReady() { return netReady(); }
 bool     hostNetIdle()   { return !netBusy(); }
+uint8_t  hostWeatherPty(){ return weather.ok ? weather.pty : 255; }
 
 static void enter(State s) {
   state = s;
@@ -136,6 +141,12 @@ static void handleCard() {
   uint8_t uid[7], len = 0;
   if (!readCard(uid, len)) return;
   int idx = findUser(uid, len);              // 배열 순차 탐색
+  if (idx >= 0 && idx == departedUser && millis() - departedAt <= CANCEL_WINDOW_MS) {
+    travelOnCancel((uint8_t)idx);            // 나갔다가 곧바로 다시 태그 → 외출 취소
+    departedUser = -1;
+    showMessage("TRIP CANCELED", USERS[idx].name, C_YELLOW, 2000, ST_IDLE);
+    return;
+  }
   if (idx < 0) showMessage("UNKNOWN CARD", "this card is not registered", C_RED, 2000, ST_PROMPT);
   else handleUser(idx);
 }
@@ -164,6 +175,8 @@ static void sendDeparture() {
     }
   }
   travelOnDeparture(ev);
+  departedUser = armedUser;
+  departedAt = millis();
   armedUser = -1;
 }
 

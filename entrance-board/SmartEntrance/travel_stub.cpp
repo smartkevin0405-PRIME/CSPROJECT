@@ -33,4 +33,11 @@ int16_t travelGetSlackSec(uint8_t, const char*, uint16_t etaSec) {
   if (etaSec == TRAVEL_UNKNOWN_SEC) return TRAVEL_NO_SLACK;
   return (int16_t)((int32_t)etaSec - STUB_WALK_SEC);
 }
+
+void travelOnCancel(uint8_t userId) {
+  Serial.print(F("[travel stub] cancel user="));
+  Serial.println(userId);
+}
+
+bool travelPhoneOnline(uint8_t) { return false; }
 #endif
