@@ -4,7 +4,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
-for name in main_flow door_sensor; do
+for name in main_flow door_sensor json_str; do
   "${CXX:-g++}" -std=c++17 -Wall -Wextra -Werror -I"$HERE/shim" "$HERE/$name.cpp" -o "$OUT/$name"
   "$OUT/$name"
 done

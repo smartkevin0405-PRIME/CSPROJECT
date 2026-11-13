@@ -45,6 +45,7 @@ const uint32_t WEATHER_MS       = 600000;  // 날씨 갱신 간격
 const uint32_t WEATHER_RETRY_MS = 30000;   // 날씨 조회 실패 뒤 다시 시도할 간격 (N5)
 const uint32_t WEATHER_KEEP_MS  = 1800000; // 조회가 실패해도 마지막 정상 날씨를 유지하는 시간 (N5)
 const uint32_t CANCEL_WINDOW_MS = 90000;   // 출발 후 이 안에 같은 사람이 다시 태그하면 외출 취소
+const uint32_t RETAG_IGNORE_MS  = 5000;    // 같은 사람이 이 안에 다시 태그하면 무시한다 (C03)
 const uint32_t HTTP_TIMEOUT_MS  = 8000;    // API 요청 1건(연결부터 응답 끝까지) 전체 제한 시간
 const uint32_t HTTP_CONNECT_TIMEOUT_MS = 4000; // API 서버 연결 단계 제한 시간 (B12)
 

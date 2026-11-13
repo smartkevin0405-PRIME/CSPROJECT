@@ -45,6 +45,7 @@ static void reset(){
  weatherTried=true; weatherAt=clockMs; weather.ok=true;
  armedUser=curUser=departedUser=-1; state=ST_IDLE;
  pirNow=doorOpenNow=false; cancels=0; shimCardLen=0; armedDoorOpen=false; weatherOkAt=clockMs;
+ lastTagUser=-1; lastTagMs=0;
 }
 int main(){
  reset(); openOnFetch=1; handleUser(0);
@@ -90,5 +91,25 @@ int main(){
  reset(); failApis=true; refreshWeather(); assert(weather.ok);
  // N6: 사람이 감지되는 동안에는 대기 중 날씨 갱신을 미룬다
  reset(); weather.ok=false; pirNow=true; clockMs+=WEATHER_RETRY_MS; loop(); assert(requests==0);
+ // C02: 문이 열린 채 다시 태그해 취소하면, 문을 닫는 순간을 출발로 보지 않는다
+ reset(); openOnFetch=1; handleUser(0); assert(departures==1 && departedUser==0);
+ clockMs+=10000; doorOpenNow=true;
+ memcpy(shimCardUid, USERS[0].uid, USERS[0].uidLen); shimCardLen=USERS[0].uidLen;
+ loop(); assert(cancels==1 && armedUser==0 && !armedDoorOpen);
+ clockMs+=3000; doorOpenNow=false; loop(); assert(departures==1);     // 문을 닫아도 출발 아님
+ openedAt=clockMs; openedFlag=true; clockMs+=50; loop(); assert(departures==2);   // 다시 열면 출발
+ // C03: 같은 카드를 5초 안에 다시 찍으면 무시하고, 5초 뒤에는 다시 조회한다
+ reset();
+ memcpy(shimCardUid, USERS[0].uid, USERS[0].uidLen); shimCardLen=USERS[0].uidLen;
+ loop(); assert(state==ST_SHOW); unsigned r1=requests;
+ clockMs+=2000;
+ memcpy(shimCardUid, USERS[0].uid, USERS[0].uidLen); shimCardLen=USERS[0].uidLen;
+ loop(); assert(requests==r1 && state==ST_SHOW);   // 5초 안: 무시
+ clockMs+=4000;
+ memcpy(shimCardUid, USERS[0].uid, USERS[0].uidLen); shimCardLen=USERS[0].uidLen;
+ loop(); assert(requests>r1);                     // 5초 뒤: 다시 조회
+ // C05: 사람이 계속 감지돼 갱신이 미뤄져도 30분 넘은 날씨는 버린다
+ reset(); weatherOkAt=clockMs; clockMs+=WEATHER_KEEP_MS+1; pirNow=true; loop();
+ assert(!weather.ok && requests==0);   // 갱신은 미루되(N6) 오래된 값은 버린다
  puts("현관판 통합 흐름 회귀 시험 통과");
 }
