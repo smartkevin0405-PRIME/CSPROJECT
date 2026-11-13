@@ -696,10 +696,11 @@ public class StandbyService extends Service
 
     private void serve(Socket s, long received) {
         try {
-            s.setSoTimeout(3000);
+            s.setSoTimeout(1000);
+            long deadline = System.nanoTime() + 3000L * 1000000L;   // 요청 전체를 3초 안에 (B16)
             HttpMini.Response resp;
             try {
-                HttpMini.Request req = HttpMini.readRequest(s.getInputStream(), Proto.MAX_BODY);
+                HttpMini.Request req = HttpMini.readRequest(s.getInputStream(), Proto.MAX_BODY, deadline);
                 resp = logic.handle(req, received);
             } catch (HttpMini.HttpError e) {
                 resp = new HttpMini.Response(e.status, "{\"ok\":0,\"err\":\"" + e.err + "\"}");

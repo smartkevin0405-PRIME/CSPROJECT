@@ -54,6 +54,44 @@ public final class HttpMini {
 
     private static final int MAX_LINE = 512;
     private static final int MAX_HEADERS = 24;
+    private static final int MAX_HEADER_BYTES = 4096;   // 요청 줄 + 헤더 전체(CR 포함) 상한 (B16)
+
+    /** 마감 시각과 헤더 바이트 상한을 지키는 입력 스트림 (B16) */
+    private static final class Guarded extends InputStream {
+        private final InputStream in;
+        private final long deadlineNs;
+        private int headerLeft = MAX_HEADER_BYTES;
+        private boolean inBody;
+
+        Guarded(InputStream in, long deadlineNs) {
+            this.in = in;
+            this.deadlineNs = deadlineNs;
+        }
+
+        void headerDone() {
+            inBody = true;
+        }
+
+        private void check() throws IOException {
+            if (deadlineNs != 0 && System.nanoTime() - deadlineNs > 0) throw new IOException("요청 시간 초과");
+        }
+
+        @Override
+        public int read() throws IOException {
+            check();
+            int c = in.read();
+            if (c >= 0 && !inBody && --headerLeft < 0) throw new HttpError(400, "json");
+            return c;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            check();
+            int n = in.read(b, off, len);
+            check();
+            return n;
+        }
+    }
 
     private static String readLine(InputStream in) throws IOException {
         ByteArrayOutputStream buf = new ByteArrayOutputStream(96);
@@ -106,6 +144,12 @@ public final class HttpMini {
 
     /** 서버 쪽: 요청 한 건을 읽는다. 형식 오류는 HttpError로 던진다. */
     public static Request readRequest(InputStream in, int maxBody) throws IOException {
+        return readRequest(in, maxBody, 0L);
+    }
+
+    /** deadlineNs(System.nanoTime 기준)가 0이 아니면 그 시각이 지나면 IOException (B16). */
+    public static Request readRequest(InputStream raw, int maxBody, long deadlineNs) throws IOException {
+        Guarded in = new Guarded(raw, deadlineNs);
         String line = readLine(in);
         if (line == null) throw new IOException("빈 연결");
         String[] parts = line.split(" ");
@@ -114,6 +158,7 @@ public final class HttpMini {
         r.method = parts[0];
         r.path = parts[1];
         readHeaders(in, r.headers);
+        in.headerDone();
         r.body = readBody(in, r.headers, maxBody);
         return r;
     }

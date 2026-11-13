@@ -73,6 +73,8 @@ public final class PhoneServerLogic {
         } catch (FlatJson.ParseError e) {
             return err(400, "json");
         }
+        // 규격 버전 확인 (B18)
+        if (!FlatJson.hasLong(j, "v") || FlatJson.getLong(j, "v", 0) != Proto.V) return err(400, "field");
         if (!FlatJson.hasLong(j, "trip") || !FlatJson.hasLong(j, "user")) return err(400, "field");
         long trip = FlatJson.getLong(j, "trip", 0);
         if (trip <= 0 || trip > 0xFFFFFFFFL) return err(400, "field");
@@ -84,21 +86,29 @@ public final class PhoneServerLogic {
                     || !FlatJson.hasLong(j, "tb") || !FlatJson.hasLong(j, "age_ms")) {
                 return err(400, "field");
             }
+            long stopL = FlatJson.getLong(j, "stop", -1);
+            long wxL = FlatJson.getLong(j, "wx", -1);
+            long tbL = FlatJson.getLong(j, "tb", -1);
+            long ageL = FlatJson.getLong(j, "age_ms", -1);
+            // int로 바꾸기 전에 long 상태에서 범위를 검사한다 (B18)
+            if (stopL < 0 || stopL > Proto.MAX_STOPS || wxL < 0 || wxL > 2
+                    || !((tbL >= 0 && tbL <= 3) || tbL == Proto.TB_UNKNOWN) || ageL < 0) {
+                return err(400, "field");
+            }
+            if (ageL > Proto.STALE_AGE_MS) return err(400, "stale");
+            long tryL = FlatJson.getLong(j, "try", 1);
+            long etaL = FlatJson.getLong(j, "eta_s", -1);
+            long tcL = FlatJson.getLong(j, "tc", -128);
             Depart d = new Depart();
             d.trip = trip;
             d.user = cb.user();
-            d.stop = (int) FlatJson.getLong(j, "stop", 0);
-            d.wx = (int) FlatJson.getLong(j, "wx", 0);
-            d.tb = (int) FlatJson.getLong(j, "tb", Proto.TB_UNKNOWN);
-            d.ageMs = FlatJson.getLong(j, "age_ms", 0);
-            d.tryNo = (int) FlatJson.getLong(j, "try", 1);
-            d.etaS = (int) FlatJson.getLong(j, "eta_s", -1);
-            d.tempC = (int) FlatJson.getLong(j, "tc", -128);
-            if (d.stop < 0 || d.stop > Proto.MAX_STOPS || d.wx < 0 || d.wx > 2
-                    || !((d.tb >= 0 && d.tb <= 3) || d.tb == Proto.TB_UNKNOWN) || d.ageMs < 0) {
-                return err(400, "field");
-            }
-            if (d.ageMs > Proto.STALE_AGE_MS) return err(400, "stale");
+            d.stop = (int) stopL;
+            d.wx = (int) wxL;
+            d.tb = (int) tbL;
+            d.ageMs = ageL;
+            d.tryNo = (tryL >= 1 && tryL <= 255) ? (int) tryL : 1;
+            d.etaS = (etaL >= -1 && etaL <= 65535) ? (int) etaL : -1;
+            d.tempC = (tcL >= -128 && tcL <= 127) ? (int) tcL : -128;
             st = cb.onDepart(d, receivedElapsedMs);
         } else {
             st = cb.onCancel(trip);
