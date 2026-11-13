@@ -428,6 +428,20 @@ static void testHandlers() {
   r = call(*tl, sq);
   CHECK("stats 최대 길이 응답도 온전함", r.status == 200 && r.body.size() < TL_BODY_MAX && r.body.back() == '}');
   delete tl;
+
+  // B15: 최근 목록(8개)에서 밀려난 오래된 서명 기록을 다시 보내도 통계에 또 반영되지 않는다
+  HostEeprom::inst().reset();
+  tl = boot();
+  std::string old1001 = tripBody(1001, 1, 2, 1, 0, "arrived", 300000);
+  r = call(*tl, mkReq("POST", "/v1/trips", old1001.c_str(), 1, KEY));
+  CHECK("B15 1001 정상 도착 반영", r.status == 200 && jU(r.body, "applied") == 1);
+  for (uint32_t t = 1002; t <= 1009; t++) postTrip(*tl, t, 2, 1, 0, "arrived", 300000);   // 8건 → 1001이 최근 목록에서 밀려남
+  TlCell cb; tl->store().getCell(TlStats::cellIndex(1, 2, 1, 0), &cb);
+  r = call(*tl, mkReq("POST", "/v1/trips", old1001.c_str(), 1, KEY));                     // 같은 본문을 다시 보냄
+  TlCell ca; tl->store().getCell(TlStats::cellIndex(1, 2, 1, 0), &ca);
+  CHECK("B15 밀려난 옛 기록 재전송 → dup, 반영 0, 표본 수 그대로", r.status == 200 && jS(r.body, "why") == "dup"
+        && jU(r.body, "applied") == 0 && cb.n == 9 && ca.n == cb.n);
+  delete tl;
 }
 
 // ---------------------------------------------------------------- 5. 저장소
@@ -470,7 +484,9 @@ static void testStore() {
   for (uint32_t k = 0; k < TL_DEDUP_RING; k++) tl->store().addTrip(3, 7000 + k);
   CHECK("목록이 꽉 찬 상태", tl->store().seenTrip(3, 7000) && tl->store().seenTrip(3, 7000 + TL_DEDUP_RING - 1));
   tl->store().addTrip(3, 7999);
-  CHECK("9번째가 들어가면 첫째가 빠짐", !tl->store().seenTrip(3, 7000) && tl->store().seenTrip(3, 7001) && tl->store().seenTrip(3, 7999));
+  CHECK("9번째가 들어가면 목록에선 빠져도 최고값 이하라 여전히 중복 (B15)", tl->store().seenTrip(3, 7000) && tl->store().seenTrip(3, 7001) && tl->store().seenTrip(3, 7999));
+  CHECK("최고값보다 큰 새 ID는 중복 아님 (B15)", !tl->store().seenTrip(3, 8000));
+  CHECK("폰 ID(최상위 비트 1)는 최고값을 따로 셈 (B15)", !tl->store().seenTrip(3, 0x80000001UL));
   CHECK("이동 ID 0은 기록·조회하지 않음", !tl->store().seenTrip(1, 0));
 
   // 한 벌이 깨져도 다른 벌로 살아난다
@@ -637,6 +653,7 @@ struct FakePhone {
   int lfd = -1, port = 0;
   std::atomic<int> mode{0};
   std::atomic<int> hits{0};
+  std::atomic<int> cancelHits{0};   // /v1/cancel 요청을 받은 횟수 (B03)
   std::atomic<bool> run{true};
   std::string lastBody, lastPath;
   std::thread th;
@@ -678,6 +695,7 @@ struct FakePhone {
         char want[TL_MAC_HEX + 1];
         tlMacRequest(KEY, "POST", path.c_str(), body.c_str(), want);
         lastBody = body; lastPath = path;
+        if (path == "/v1/cancel") cancelHits++;   // B03
         std::string resp;
         if (reqMac != want) {
           resp = "HTTP/1.1 401 Unauthorized\r\nContent-Length: 20\r\nConnection: close\r\n\r\n{\"ok\":0,\"err\":\"auth\"}";
@@ -790,6 +808,18 @@ static void testSockets() {
   ph.mode = 0;
   pump(tl, 1300);
   CHECK("대체된 뒤 최신 trip만 전달", gDepOk == 1 && gDepTrip == t3);
+
+  // --- B03: 응답이 유실돼 전달을 포기(45초)한 뒤에도 취소 신호를 보낸다. 가짜 시계로 빠르게 돌린다.
+  ph.mode = 1; ph.hits = 0; ph.cancelHits = 0; gDepOk = gDepFail = 0;   // 폰은 요청을 받지만 응답 MAC이 틀려 미전달로 남는다
+  hostFakeTime(true, 1000000UL);
+  tl.notifyDeparture(1, 0, 0, 0);
+  for (int i = 0; gDepFail == 0 && i < 600; i++) { tl.loop(); hostAdvance(100); }   // 46초쯤 진행해 포기 상태로
+  CHECK("B03 응답 유실 시험 준비: 폰은 받았지만 전달 포기", gDepOk == 0 && gDepFail == 1 && ph.hits >= 1 && ph.cancelHits == 0);
+  tl.cancelDeparture(1);
+  for (int i = 0; i < 20; i++) { tl.loop(); hostAdvance(100); }
+  hostFakeTime(false);
+  CHECK("B03 전달 포기 뒤에도 취소 신호를 보냄", ph.cancelHits >= 1);
+  ph.mode = 0;
   ph.stop();
 
   // --- 폰이 없음(연결 거부): 45초 동안 재시도 후 포기. 가짜 시계로 빠르게 돌린다.

@@ -139,7 +139,9 @@ bool TlStore::seenTrip(uint8_t user, uint32_t trip) const {
   for (uint8_t i = 0; i < TL_DEDUP_RING; i++) {
     if (rd32(p + 4 * i) == trip) return true;
   }
-  return false;
+  // 폰은 기록을 이동 ID 오름차순으로 보낸다. 이미 처리한 가장 큰 ID 이하는 재전송으로 본다. (B15)
+  uint32_t hw = rd32(p + TL_DEDUP_HW_OFF + ((trip & 0x80000000UL) ? 4 : 0));
+  return hw != 0 && trip <= hw;
 }
 
 void TlStore::addTrip(uint8_t user, uint32_t trip) {
@@ -148,6 +150,8 @@ void TlStore::addTrip(uint8_t user, uint32_t trip) {
   uint8_t pos = (uint8_t)(p[TL_DEDUP_RING * 4] % TL_DEDUP_RING);
   wr32(p + 4 * pos, trip);
   p[TL_DEDUP_RING * 4] = (uint8_t)((pos + 1) % TL_DEDUP_RING);   // 가장 오래된 것부터 덮어쓴다
+  uint8_t* h = p + TL_DEDUP_HW_OFF + ((trip & 0x80000000UL) ? 4 : 0);
+  if (trip > rd32(h)) wr32(h, trip);                              // 최고값 갱신 (B15)
 }
 
 bool TlStore::commit() {

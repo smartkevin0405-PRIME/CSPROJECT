@@ -123,9 +123,9 @@ uint32_t TravelLearn::notifyDeparture(uint8_t user, uint8_t stopHint, uint8_t wx
 void TravelLearn::cancelDeparture(uint8_t user) {
   if (user < 1 || user > TL_MAX_USERS) return;
   Pending& p = _pend[user - 1];
-  if (p.state == ST_SENDING) {
-    // 아직 전달 확인을 못 받았어도 폰이 받았을 수 있으므로 취소 신호는 보낸다.
-    if (_cbDepart) _cbDepart(user, p.trip, false);
+  if (p.state == ST_SENDING || p.state == ST_FAILED) {
+    // 전달 확인을 못 받았어도(응답 유실 포함) 폰이 받았을 수 있으므로 취소 신호는 보낸다. (B03)
+    if (p.state == ST_SENDING && _cbDepart) _cbDepart(user, p.trip, false);
   } else if (p.state != ST_DELIVERED) {
     return;
   }
