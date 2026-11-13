@@ -34,6 +34,7 @@ class VirtualBoard(object):
         self.state = {"boot": int(st.get("boot", 0)) + 1,
                       "phones": st.get("phones", {}),
                       "dedup": st.get("dedup", {}),
+                      "hw": st.get("hw", {}),
                       "cells": st.get("cells", {})}
         self.stats = tl.Stats(self.state["cells"])
         self._save()
@@ -133,11 +134,14 @@ class VirtualBoard(object):
         dd = self.state["dedup"].setdefault(str(user), [])
         stop, wx, tb = f["stop"], f["wx"], f["tb"]
         applied, why = 0, None
-        if trip in dd:
+        hw = self.state["hw"].setdefault(str(user), {"board": 0, "phone": 0})
+        ns = "phone" if trip & 0x80000000 else "board"
+        if trip in dd or (hw[ns] and trip <= hw[ns]):  # 처리한 최고값 이하는 재전송 (B15)
             why = "dup"
         else:
             dd.append(trip)
             del dd[:-8]  # 최근 8개만
+            hw[ns] = trip
             if st != "arrived":
                 why = "status"
             elif not (1 <= stop <= 4):

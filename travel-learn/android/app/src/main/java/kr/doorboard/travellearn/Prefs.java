@@ -26,7 +26,9 @@ public final class Prefs {
     public static byte[] key(Context c) { return Proto.parseKey(keyHex(c)); }
     /** 사용자가 "대기 시작"을 눌러 둔 상태인지(재부팅 후 자동 시작 여부). */
     public static boolean enabled(Context c) { return sp(c).getBoolean("enabled", false); }
-    public static int maxTripMin(Context c) { return sp(c).getInt("max_trip_min", 30); }
+    public static int maxTripMin(Context c) {
+        return Math.max(5, Math.min(60, sp(c).getInt("max_trip_min", 30)));   // B19
+    }
 
     public static void setEnabled(Context c, boolean v) {
         sp(c).edit().putBoolean("enabled", v).apply();
@@ -66,18 +68,20 @@ public final class Prefs {
     // ---- 진행 중인 이동(프로세스가 죽었다 살아날 때 이어서 재기 위함) ----
 
     public static void saveActive(Context c, long trip, long t0Elapsed, int bootCount,
-            boolean leftHome) {
+            boolean leftHome, boolean wifiLost) {
         sp(c).edit().putLong("active_trip", trip).putLong("active_t0", t0Elapsed)
-                .putInt("active_boot", bootCount).putBoolean("active_left", leftHome).apply();
+                .putInt("active_boot", bootCount).putBoolean("active_left", leftHome)
+                .putBoolean("active_wifi_lost", wifiLost).apply();   // 두 상태를 따로 저장 (B06)
     }
 
     public static void clearActive(Context c) {
         sp(c).edit().remove("active_trip").remove("active_t0").remove("active_boot")
-                .remove("active_left").apply();
+                .remove("active_left").remove("active_wifi_lost").apply();
     }
 
     public static long activeTrip(Context c) { return sp(c).getLong("active_trip", 0); }
     public static long activeT0(Context c) { return sp(c).getLong("active_t0", 0); }
     public static int activeBoot(Context c) { return sp(c).getInt("active_boot", -1); }
     public static boolean activeLeft(Context c) { return sp(c).getBoolean("active_left", false); }
+    public static boolean activeWifiLost(Context c) { return sp(c).getBoolean("active_wifi_lost", false); }
 }

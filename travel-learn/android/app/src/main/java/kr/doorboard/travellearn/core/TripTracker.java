@@ -37,6 +37,8 @@ public final class TripTracker {
         public long minTripMs = 20 * 1000L;
         /** 첫 위치에서 이만큼 멀어지면 집을 떠난 것으로 본다(m). */
         public float leftHomeM = 60f;
+        /** 연속 판정에 쓰는 위치 사이가 이보다 벌어지면 연속 판정을 처음부터 다시 한다(B04). */
+        public long maxFixGapMs = 15 * 1000L;
     }
 
     private final Config cfg;
@@ -51,6 +53,7 @@ public final class TripTracker {
     private long lastUsableFixMs;
     private long lastFixMs;
     private int fixCount;
+    private long lastRunFixMs;   // 연속 판정에 마지막으로 쓴 위치의 시각 (B04)
 
     private boolean haveFirst;
     private double firstLat;
@@ -102,13 +105,18 @@ public final class TripTracker {
         lastFixMs = 0;
         fixCount = 0;
         haveFirst = false;
+        lastRunFixMs = 0;
         resetRuns();
     }
 
-    /** 재시작 후 이어서 측정할 때: 이미 집을 떠났는지 여부를 복원한다. */
-    public void restoreLeftHome(boolean v) {
-        leftHome = v;
-        wifiLost = v;
+    /** 재시작 후 이어서 측정할 때: 저장해 둔 두 상태를 따로 복원한다. GPS로 집을 벗어난 것과 Wi-Fi가 끊긴 것은 다르다 (B06). */
+    public void restoreState(boolean leftHomeV, boolean wifiLostV) {
+        leftHome = leftHomeV;
+        wifiLost = wifiLostV;
+    }
+
+    public boolean hasLostWifi() {
+        return wifiLost;
     }
 
     private void resetRuns() {
@@ -121,6 +129,7 @@ public final class TripTracker {
     /** 집 Wi-Fi가 끊어짐 = 집을 떠났다는 신호. */
     public void onWifiLost() {
         if (rec != null) {
+            if (!leftHome) resetRuns();   // 집을 떠나기 전의 연속 판정은 버린다 (B08)
             leftHome = true;
             wifiLost = true;
         }
@@ -146,7 +155,22 @@ public final class TripTracker {
         } else if (!leftHome && accM <= cfg.goodAccM
                 && Geo.distanceM(firstLat, firstLon, lat, lon) > cfg.leftHomeM) {
             leftHome = true;
+            resetRuns();                  // 집을 떠나기 전의 연속 판정은 버린다 (B08)
         }
+
+        // 집을 떠난 근거(Wi-Fi 끊김 또는 첫 위치에서 60m 넘게 이동)가 없으면 자동 도착을 판정하지 않는다 (B08)
+        if (!leftHome) {
+            resetRuns();
+            return;
+        }
+        // 최소 이동 시간 전의 위치로는 연속 판정을 시작하지 않는다 (B09)
+        if (fixElapsedMs - t0 < cfg.minTripMs) {
+            resetRuns();
+            return;
+        }
+        // 연속 판정에 쓴 위치 사이가 너무 벌어졌으면 이전 연속 판정을 버린다 (B04)
+        if (lastRunFixMs != 0 && fixElapsedMs - lastRunFixMs > cfg.maxFixGapMs) resetRuns();
+        lastRunFixMs = fixElapsedMs;
 
         // 가장 가까운 정류장 찾기
         Geo.Stop best = null;
@@ -214,6 +238,7 @@ public final class TripTracker {
             finish(Proto.ST_CANCELED, 0, 0, 0, "집을 떠나지 않음");
             return;
         }
+        if (lastRunFixMs != 0 && nowElapsedMs - lastRunFixMs > cfg.maxFixGapMs) resetRuns();   // B04
         if (!needManualSent && el >= 30000L && nowElapsedMs - lastUsableFixMs >= cfg.needManualMs) {
             needManualSent = true;
             listener.onNeedManual(rec);
