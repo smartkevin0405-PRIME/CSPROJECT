@@ -22,6 +22,7 @@ static uint32_t messageMs = 0;
 static WeatherInfo weather = { false, -128, 0, 255, 255, WX_UNKNOWN };
 static uint32_t    weatherAt = 0;
 static bool        weatherTried = false;
+static uint32_t    weatherOkAt = 0;          // 마지막으로 날씨를 받은 시각 (N5)
 
 static bool     indoorOk = false;
 static int8_t   indoorTemp = 0;
@@ -39,6 +40,7 @@ static uint32_t       lastTick = 0;
 static int      armedUser = -1;
 static uint32_t armedAt = 0;
 static uint32_t departSeq = 0;
+static bool     armedDoorOpen = false;   // 문이 열린 채로 태그했는지 (N2)
 
 // 외출 취소 판단용: 마지막으로 출발 신호를 보낸 사람과 시각
 static int      departedUser = -1;
@@ -74,12 +76,16 @@ static void goIdle() {
 static void refreshWeather() {
   weatherTried = true;
   weatherAt = millis();
-  if (fetchWeather(weather)) {
+  WeatherInfo fresh = weather;
+  if (fetchWeather(fresh)) {
+    weather = fresh;
+    weatherOkAt = millis();
     matrixShowTemp(weather.tempC);
     dialSet(weather.kind);
-  } else {
+  } else if (!weather.ok || millis() - weatherOkAt > WEATHER_KEEP_MS) {
+    weather.ok = false;                      // 오래 실패했으면 이전 값도 버린다 (N5)
     matrixShowNone();
-  }
+  }                                          // 그 밖에는 마지막 정상 값을 그대로 둔다 (N5)
 }
 
 // 카드가 새로 닿았으면 UID를 읽는다
@@ -126,13 +132,17 @@ static bool betweenFetches() {
 // 조회 중 문이 열리면 현재 요청까지만 마치고 출발을 전달한다
 static void handleUser(int idx) {
   const User& u = USERS[idx];
+  if (armedUser >= 0 && armedUser != idx) {  // 마지막으로 태그한 사람이 출발 대상이다 (B01)
+    Serial.println(F("[main] armed user replaced"));
+  }
   doorJustOpened();                          // 태그 전에 열린 문은 이번 출발이 아니다
   armedUser = idx;                           // API 실패와 무관하게 출발을 감시한다
   armedAt = millis();
+  armedDoorOpen = doorIsOpen();              // 문이 열린 채 태그했으면 닫힐 때를 출발로 본다 (N2)
   curUser = idx;
   memset(arrivalOk, 0, sizeof(arrivalOk));
   screenMessage("LOADING", u.name, C_CYAN);
-  if (!weatherTried || millis() - weatherAt > 60000) {
+  if (!weatherTried || millis() - weatherAt > (weather.ok ? 60000UL : 15000UL)) {   // N5
     refreshWeather();
     if (betweenFetches()) return;
   }
@@ -156,18 +166,21 @@ static void handleUser(int idx) {
   enter(ST_SHOW);
 }
 
-static void handleCard() {
+// 카드가 닿았으면 처리하고 true, 카드가 없으면 false
+static bool handleCard() {
   uint8_t uid[7], len = 0;
-  if (!readCard(uid, len)) return;
+  if (!readCard(uid, len)) return false;
   int idx = findUser(uid, len);              // 배열 순차 탐색
   if (idx >= 0 && idx == departedUser && millis() - departedAt <= CANCEL_WINDOW_MS) {
-    travelOnCancel((uint8_t)idx);            // 나갔다가 곧바로 다시 태그 → 외출 취소
+    travelOnCancel((uint8_t)idx);            // 나갔다가 곧바로 다시 태그 → 앞 외출 취소
     departedUser = -1;
-    showMessage("TRIP CANCELED", USERS[idx].name, C_YELLOW, 2000, ST_IDLE);
-    return;
+    Serial.println(F("[main] trip canceled by re-tag"));
+    handleUser(idx);                         // 취소한 뒤 정보를 다시 보여 주고 새 출발을 감시한다 (N3)
+    return true;
   }
   if (idx < 0) showMessage("UNKNOWN CARD", "this card is not registered", C_RED, 2000, ST_PROMPT);
   else handleUser(idx);
+  return true;
 }
 
 // 태그한 사람이 문을 열고 나갔다: 이동 모듈에 알린다
@@ -205,9 +218,15 @@ static bool processDeparture() {
   uint32_t openedAt = 0;
   bool opened = doorJustOpened(&openedAt);
   if (armedUser < 0) return false;
+  if (!opened && armedDoorOpen && !doorIsOpen()) {   // 열린 채 태그했고 이제 닫혔다 → 그 순간을 출발로 본다 (N2)
+    opened = true;
+    openedAt = millis();
+  }
   uint32_t at = opened ? openedAt : (uint32_t)millis();
-  if (at - armedAt > DEPART_WINDOW_MS) { armedUser = -1; return false; }
+  if ((int32_t)(at - armedAt) < 0) at = armedAt;     // 태그 직전에 열린 문은 태그 순간으로 본다 (N2)
+  if (at - armedAt > DEPART_WINDOW_MS) { armedUser = -1; armedDoorOpen = false; return false; }
   if (!opened) return false;
+  armedDoorOpen = false;
   sendDeparture(openedAt);
   showMessage("HAVE A NICE DAY", "", C_GREEN, 3000, ST_IDLE);
   return true;
@@ -243,7 +262,10 @@ void loop() {
         if (dhtRead(t, h)) { indoorOk = true; indoorTemp = t; indoorHum = h; }
         screenIdleUpdate(indoorOk, indoorTemp, indoorHum);
       }
-      if (now - weatherAt >= WEATHER_MS) refreshWeather(); // 외부 기온 갱신
+      {
+        uint32_t wInterval = weather.ok ? WEATHER_MS : WEATHER_RETRY_MS;       // 실패하면 30초 뒤 다시 (N5)
+        if (now - weatherAt >= wInterval && !pirActive()) refreshWeather();    // 사람이 있으면 미룬다 (N6)
+      }
       handleCard();
       if (state == ST_IDLE && pirActive()) { screenPrompt(); enter(ST_PROMPT); }
       break;
@@ -258,6 +280,7 @@ void loop() {
 
     case ST_SHOW:
       if (now - stateSince >= SHOW_MS) { goIdle(); break; }
+      if (handleCard()) break;                           // 표시 중에도 새 태그를 받는다 (B01)
       if (now - lastTick >= 1000) {                      // 1초마다 남은 시간 갱신
         lastTick = now;
         drawRows();
@@ -267,6 +290,7 @@ void loop() {
       break;
 
     case ST_MESSAGE:
+      if (handleCard()) break;                           // 안내 문구 중에도 태그를 받는다 (B01)
       if (now - stateSince >= messageMs) {
         if (afterMessage == ST_PROMPT) { screenPrompt(); enter(ST_PROMPT); }
         else goIdle();
