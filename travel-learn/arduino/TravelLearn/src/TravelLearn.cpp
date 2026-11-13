@@ -120,6 +120,10 @@ uint32_t TravelLearn::notifyDeparture(uint8_t user, uint8_t stopHint, uint8_t wx
   return p.trip;
 }
 
+uint32_t TravelLearn::boardLimit() const {
+  return ((uint32_t)(_store.boot() & 0x7FFF) << 16) | _seq;
+}
+
 void TravelLearn::cancelDeparture(uint8_t user) {
   if (user < 1 || user > TL_MAX_USERS) return;
   Pending& p = _pend[user - 1];
@@ -342,7 +346,7 @@ int TravelLearn::handleTrips(const TlHttpReq* req, char* out, size_t cap) {
   uint8_t u = (uint8_t)user;
 
   // 1) 중복: 이미 처리한 이동 ID
-  if (_store.seenTrip(u, trip)) {
+  if (_store.seenTrip(u, trip, boardLimit())) {
     snprintf(out, cap, "{\"ok\":1,\"trip\":%lu,\"stored\":1,\"applied\":0,\"why\":\"dup\"}", (unsigned long)trip);
     return 200;
   }
@@ -368,7 +372,7 @@ int TravelLearn::handleTrips(const TlHttpReq* req, char* out, size_t cap) {
   }
 
   // 3) 중복 방지 목록에 넣고 EEPROM에 기록한다. 기록이 끝나야 stored:1을 보낸다.
-  _store.addTrip(u, trip);
+  _store.addTrip(u, trip, boardLimit());
   if (!_store.commit()) {
     _store.rollback();
     return errBody(out, cap, 503, "busy");

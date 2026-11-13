@@ -442,6 +442,25 @@ static void testHandlers() {
   CHECK("B15 밀려난 옛 기록 재전송 → dup, 반영 0, 표본 수 그대로", r.status == 200 && jS(r.body, "why") == "dup"
         && jU(r.body, "applied") == 0 && cb.n == 9 && ca.n == cb.n);
   delete tl;
+
+  // C01: 초기화 전 현관판(큰 부팅 번호)의 ID가 폰에 남아 있어도, 새 현관판의 학습이 멈추지 않는다
+  HostEeprom::inst().reset();
+  tl = boot();                                                              // 부팅 횟수 1
+  uint32_t c1t1 = tl->notifyDeparture(1, 0, 0, 0);                          // (1<<16)|1
+  std::string bodyF = tripBody((40UL << 16) | 3, 1, 2, 1, 0, "arrived", 300000);   // 다른 계보의 ID
+  r = call(*tl, mkReq("POST", "/v1/trips", bodyF.c_str(), 1, KEY));
+  CHECK("C01 다른 계보의 ID도 한 번은 반영", r.status == 200 && jU(r.body, "applied") == 1);
+  r = postTrip(*tl, c1t1, 2, 1, 0, "arrived", 310000);
+  CHECK("C01 다른 계보 ID가 최고값을 올리지 않아 이 현관판의 새 ID는 dup이 아님", jS(r.body, "why") != "dup" && jU(r.body, "applied") == 1);
+  r = call(*tl, mkReq("POST", "/v1/trips", bodyF.c_str(), 1, KEY));
+  CHECK("C01 다른 계보 ID를 다시 보내면 최근 목록이 막아 dup", jS(r.body, "why") == "dup" && jU(r.body, "applied") == 0);
+  delete tl;
+  tl = boot();                                                              // 부팅 횟수 2
+  r = postTrip(*tl, c1t1, 2, 1, 0, "arrived", 310000);
+  CHECK("C01 재부팅 뒤 이전 부팅의 ID는 같은 계보라 최고값 규칙 유지 → dup", jS(r.body, "why") == "dup" && jU(r.body, "applied") == 0);
+  tl->store().addTrip(3, (50UL << 16) | 1);                                 // 2인자(제한 없음)로 최고값을 오염시킴
+  CHECK("C01 오염된 최고값은 한도보다 크면 쓰지 않음", !tl->store().seenTrip(3, (2UL << 16) | 1, (2UL << 16) | 5));
+  delete tl;
 }
 
 // ---------------------------------------------------------------- 5. 저장소

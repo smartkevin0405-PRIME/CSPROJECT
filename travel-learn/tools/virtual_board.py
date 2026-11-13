@@ -135,13 +135,18 @@ class VirtualBoard(object):
         stop, wx, tb = f["stop"], f["wx"], f["tb"]
         applied, why = 0, None
         hw = self.state["hw"].setdefault(str(user), {"board": 0, "phone": 0})
-        ns = "phone" if trip & 0x80000000 else "board"
-        if trip in dd or (hw[ns] and trip <= hw[ns]):  # 처리한 최고값 이하는 재전송 (B15)
+        phone_id = bool(trip & 0x80000000)
+        ns = "phone" if phone_id else "board"
+        limit = ((self.boot & 0x7FFF) << 16) | (self.seq & 0xFFFF)  # 이 현관판이 지금까지 발급한 가장 큰 ID (C01)
+        foreign = (not phone_id) and trip > limit                  # 다른 계보의 현관판 ID: 최고값 비교·갱신에서 뺀다 (C01)
+        stale_hw = (not phone_id) and hw[ns] > limit               # 최고값 자체가 다른 계보에서 왔으면 쓰지 않는다 (C01)
+        if trip in dd or (not foreign and not stale_hw and hw[ns] and trip <= hw[ns]):  # 처리한 최고값 이하는 재전송 (B15)
             why = "dup"
         else:
             dd.append(trip)
             del dd[:-8]  # 최근 8개만
-            hw[ns] = trip
+            if not foreign and (stale_hw or trip > hw[ns]):
+                hw[ns] = trip  # 다른 계보에서 온 최고값은 덮어쓴다 (C01)
             if st != "arrived":
                 why = "status"
             elif not (1 <= stop <= 4):

@@ -62,8 +62,9 @@ class TlStore {
   bool setPhone(uint8_t user, const uint8_t ip[4], uint16_t port);   // 값이 바뀌었으면 true
 
   // 중복 방지 목록
-  bool seenTrip(uint8_t user, uint32_t trip) const;
-  void addTrip(uint8_t user, uint32_t trip);
+  // boardLimit: 이 현관판이 지금까지 발급한 가장 큰 현관판 ID. 이보다 큰 현관판 ID는 다른 계보로 본다 (C01)
+  bool seenTrip(uint8_t user, uint32_t trip, uint32_t boardLimit = 0xFFFFFFFFUL) const;
+  void addTrip(uint8_t user, uint32_t trip, uint32_t boardLimit = 0xFFFFFFFFUL);
 
   // RAM 이미지를 EEPROM의 안 쓰는 벌에 쓰고 되읽어 확인한다.
   bool commit();
