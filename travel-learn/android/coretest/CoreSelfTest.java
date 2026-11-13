@@ -14,6 +14,7 @@ import kr.doorboard.travellearn.core.PhoneServerLogic;
 import kr.doorboard.travellearn.core.Proto;
 import kr.doorboard.travellearn.core.TripRecord;
 import kr.doorboard.travellearn.core.TripTracker;
+import kr.doorboard.travellearn.core.SyncRetry;
 
 public class CoreSelfTest {
     static int pass;
@@ -280,6 +281,38 @@ public class CoreSelfTest {
             check("(i) 좌표 없는 정류장은 자동 판정 안 함", s.done == null);
             t.manualArrive(t0 + 10000, 0);
             check("(i) 20초 미만 수동 도착은 취소 처리", s.done != null && Proto.ST_CANCELED.equals(s.done.status));
+        }
+
+        // 수동 도착: 빈 슬롯을 건너뛰고, 목적지가 여러 곳이면 선택 전에는 저장하지 않는다.
+        {
+            List<Geo.Stop> l = stops(Double.NaN, Double.NaN, 30, Double.NaN, Double.NaN, 30);
+            l.get(1).name = "실제 지하철역";
+            Sink s = new Sink();
+            TripTracker t = new TripTracker(new TripTracker.Config(), l, s);
+            t.start(rec(1), t0);
+            check("수동 도착: 2번만 설정되어 있으면 2번에 저장", t.manualArrive(t0 + 300000, 0)
+                    && s.done != null && s.done.stop == 2);
+            l.get(0).name = "버스 정류장";
+            s = new Sink(); t = new TripTracker(new TripTracker.Config(), l, s); t.start(rec(2), t0);
+            check("수동 도착: 여러 정류장 중 임의 선택 금지", !t.manualArrive(t0 + 300000, 0)
+                    && t.isActive() && s.done == null);
+            check("수동 도착: 없는 정류장 거부", !t.manualArrive(t0 + 300000, 4) && t.isActive());
+            check("수동 도착: 명시적으로 고른 2번에 저장", t.manualArrive(t0 + 300000, 2)
+                    && s.done.stop == 2 && s.done.q == 2);
+            l.get(0).name = ""; l.get(1).name = "";
+            s = new Sink(); t = new TripTracker(new TripTracker.Config(), l, s); t.start(rec(3), t0);
+            check("수동 도착: 설정된 목적지가 없으면 저장 안 함", !t.manualArrive(t0 + 300000, 0)
+                    && t.isActive());
+        }
+        {
+            SyncRetry retry = new SyncRetry();
+            check("등록 재시도: 기록 유무와 무관하게 5·15·60초", retry.nextDelayMs() == 5000
+                    && retry.nextDelayMs() == 15000 && retry.nextDelayMs() == 60000);
+            boolean capped = true;
+            for (int i = 0; i < 20; i++) capped &= retry.nextDelayMs() == 300000;
+            check("등록 재시도: 5분 간격으로 계속 유지", capped);
+            retry.reset();
+            check("연결 성공·새 Wi-Fi 연결 후 처음 간격으로 복귀", retry.nextDelayMs() == 5000);
         }
 
         // ------------------------------------------------------------ 4. 폰 서버 요청 검증

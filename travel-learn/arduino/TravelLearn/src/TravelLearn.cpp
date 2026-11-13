@@ -96,7 +96,7 @@ void TravelLearn::dumpStats(Print& out) {
 // ---------------------------------------------------------------- 출발·취소
 
 uint32_t TravelLearn::notifyDeparture(uint8_t user, uint8_t stopHint, uint8_t wx, uint8_t tb,
-                                      int32_t etaS, int16_t tempC) {
+                                      int32_t etaS, int16_t tempC, uint32_t ageMs) {
   if (!_begun || user < 1 || user > TL_MAX_USERS) return 0;
   if (stopHint > TL_MAX_STOPS) stopHint = 0;
   if (wx >= TL_NUM_WX) wx = 0;
@@ -109,8 +109,8 @@ uint32_t TravelLearn::notifyDeparture(uint8_t user, uint8_t stopHint, uint8_t wx
   if (_seq == 0) _seq = 1;
   Pending& p = _pend[user - 1];
   p.trip = ((uint32_t)(_store.boot() & 0x7FFF) << 16) | _seq;
-  p.t0Ms = millis();
-  p.nextTryMs = p.t0Ms;
+  p.nextTryMs = millis();
+  p.t0Ms = p.nextTryMs - ageMs;              // API 조회 중 감지한 문 열림 시각까지 보정
   p.etaS = etaS;
   p.tempC = tempC;
   p.stop = stopHint; p.wx = wx; p.tb = tb;

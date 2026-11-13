@@ -2,6 +2,7 @@
 package kr.doorboard.travellearn.core;
 
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * 이동 한 건의 상태 기계. Android API에 의존하지 않으므로 PC의 JVM에서 그대로 시험할 수 있다.
@@ -224,19 +225,38 @@ public final class TripTracker {
         if (rec != null && wifiLost) finish(Proto.ST_CANCELED, 0, 0, 0, "도착 전 귀가");
     }
 
-    /** 사용자가 알림에서 "도착"을 누름. stopId가 0이면 예상 정류장, 그것도 없으면 첫 정류장을 쓴다. */
-    public void manualArrive(long nowElapsedMs, int stopId) {
-        if (rec == null) return;
-        int sid = stopId;
-        if (sid <= 0) sid = rec.stopHint;
-        if (sid <= 0 && nearStop > 0) sid = nearStop;
-        if (sid <= 0 && !stops.isEmpty()) sid = stops.get(0).id;
-        if (sid <= 0) sid = 1;
+    /** 수동 확인에 쓸 수 있는 설정된 정류장. 빈 슬롯은 제외한다. */
+    public List<Geo.Stop> manualStops() {
+        List<Geo.Stop> out = new ArrayList<Geo.Stop>();
+        for (Geo.Stop s : stops) {
+            if (s.has || !s.name.trim().isEmpty()) out.add(s);
+        }
+        return out;
+    }
+
+    private boolean knownStop(int id) {
+        for (Geo.Stop s : manualStops()) if (s.id == id) return true;
+        return false;
+    }
+
+    /** 목적지가 불명확하면 false를 반환해 선택을 요청한다. 임의로 1번에 저장하지 않는다. */
+    public boolean manualArrive(long nowElapsedMs, int stopId) {
+        if (rec == null) return false;
         if (nowElapsedMs - t0 < cfg.minTripMs) {
             finish(Proto.ST_CANCELED, 0, 0, 0, "너무 짧음");
-            return;
+            return true;
+        }
+        int sid = stopId;
+        if (sid > 0 && !knownStop(sid)) return false;
+        if (sid <= 0 && knownStop(rec.stopHint)) sid = rec.stopHint;
+        if (sid <= 0 && knownStop(nearStop)) sid = nearStop;
+        if (sid <= 0) {
+            List<Geo.Stop> choices = manualStops();
+            if (choices.size() != 1) return false;
+            sid = choices.get(0).id;
         }
         finishArrived(sid, nowElapsedMs, 2);
+        return true;
     }
 
     public void cancel(String why) {

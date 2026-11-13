@@ -32,7 +32,7 @@ static uint32_t indoorAt = 0;
 static int            curUser = -1;
 static TransitArrival arrivals[MAX_USER_STOPS];
 static bool           arrivalOk[MAX_USER_STOPS];
-static uint32_t       fetchedAt = 0;
+static uint32_t       fetchedAt[MAX_USER_STOPS]; // 도착 정보마다 조회 완료 시각이 다르다
 static uint32_t       lastTick = 0;
 
 // 태그 후 문이 열리는지 기다리는 상태
@@ -43,6 +43,8 @@ static uint32_t departSeq = 0;
 // 외출 취소 판단용: 마지막으로 출발 신호를 보낸 사람과 시각
 static int      departedUser = -1;
 static uint32_t departedAt = 0;
+
+static bool processDeparture();
 
 // ---- 이동 모듈이 부르는 함수 ----
 uint32_t hostEpochNow()  { return netEpoch(); }
@@ -93,9 +95,9 @@ static bool readCard(uint8_t* uid, uint8_t& len) {
 }
 
 // 화면에 남은 시간을 줄여서 보여 준다 (조회한 뒤 지난 시간만큼 뺀다)
-static uint16_t etaNow(uint16_t eta) {
+static uint16_t etaNow(uint16_t eta, uint32_t at) {
   if (eta == TRAVEL_UNKNOWN_SEC) return eta;
-  uint32_t passed = (millis() - fetchedAt) / 1000;
+  uint32_t passed = (millis() - at) / 1000;
   return passed >= eta ? 0 : (uint16_t)(eta - passed);
 }
 
@@ -104,8 +106,8 @@ static void drawRows() {
   for (uint8_t i = 0; i < u.stopCount; i++) {
     const Stop& s = STOPS[u.stopIdx[i]];
     TransitArrival a = arrivals[i];
-    a.etaSec[0] = etaNow(a.etaSec[0]);
-    a.etaSec[1] = etaNow(a.etaSec[1]);
+    a.etaSec[0] = etaNow(a.etaSec[0], fetchedAt[i]);
+    a.etaSec[1] = etaNow(a.etaSec[1], fetchedAt[i]);
     int16_t slack = arrivalOk[i] ? travelGetSlackSec((uint8_t)curUser, s.key, a.etaSec[0]) : TRAVEL_NO_SLACK;
     screenInfoRow(i, s, a, arrivalOk[i], slack);
   }
@@ -113,35 +115,39 @@ static void drawRows() {
 
 // 조회 한 건이 끝날 때마다 부른다. 조회하는 동안에도 문 센서와 폰 통신이 멈추지 않게 한다.
 // tl.loop()는 스택을 많이 쓰므로 조회 함수(Net.cpp) 안쪽이 아니라 여기, 조회와 조회 사이에서만 부른다.
-static void betweenFetches() {
+static bool betweenFetches() {
   devicesLoop();
+  bool departed = processDeparture();
   travelLoop();
+  return departed;
 }
 
 // 등록된 사용자가 태그했을 때: 조회하고 표시한다
-// 조회 중에 문이 열렸으면 그 신호는 남아 있다가, 조회가 끝난 뒤 loop()에서 외출로 처리된다
+// 조회 중 문이 열리면 현재 요청까지만 마치고 출발을 전달한다
 static void handleUser(int idx) {
   const User& u = USERS[idx];
+  doorJustOpened();                          // 태그 전에 열린 문은 이번 출발이 아니다
+  armedUser = idx;                           // API 실패와 무관하게 출발을 감시한다
+  armedAt = millis();
+  curUser = idx;
+  memset(arrivalOk, 0, sizeof(arrivalOk));
   screenMessage("LOADING", u.name, C_CYAN);
   if (!weatherTried || millis() - weatherAt > 60000) {
     refreshWeather();
-    betweenFetches();
+    if (betweenFetches()) return;
   }
 
   bool any = false;
   for (uint8_t i = 0; i < u.stopCount; i++) {
     arrivalOk[i] = fetchArrival(STOPS[u.stopIdx[i]], arrivals[i]);
+    fetchedAt[i] = millis();
     if (arrivalOk[i]) any = true;
-    betweenFetches();
+    if (betweenFetches()) return;
   }
   if (!any && !weather.ok) {                 // 아무것도 못 받았으면 NO DATA
     showMessage("NO DATA", "check WiFi or API key", C_RED, 3000, ST_IDLE);
     return;
   }
-  curUser = idx;
-  fetchedAt = millis();
-  armedUser = idx;                           // 이제부터 문이 열리면 외출로 본다
-  armedAt = millis();
   screenInfo(u, weather);
   drawRows();
   screenInfoCountdown(SHOW_MS / 1000);
@@ -165,13 +171,14 @@ static void handleCard() {
 }
 
 // 태그한 사람이 문을 열고 나갔다: 이동 모듈에 알린다
-static void sendDeparture() {
+static void sendDeparture(uint32_t openedAtMs) {
   const User& u = USERS[armedUser];
   static DepartureEvent ev;                  // 크기가 커서(약 70바이트) 1KB 메인 스택 대신 전역 영역에 둔다
   memset(&ev, 0, sizeof(ev));
   ev.seq = ++departSeq;
   ev.epochSec = netEpoch();
-  ev.uptimeMs = millis();
+  if (ev.epochSec != 0) ev.epochSec -= (uint32_t)(millis() - openedAtMs) / 1000;
+  ev.uptimeMs = openedAtMs;
   ev.userId = (uint8_t)armedUser;
   strncpy(ev.stopId, STOPS[u.stopIdx[0]].key, sizeof(ev.stopId) - 1);
   ev.outdoorTempC = weather.ok ? weather.tempC : -128;
@@ -183,14 +190,27 @@ static void sendDeparture() {
       if (!arrivalOk[i]) continue;
       TransitArrival& a = ev.arrivals[ev.arrivalCount++];
       a = arrivals[i];
-      a.etaSec[0] = etaNow(a.etaSec[0]);
-      a.etaSec[1] = etaNow(a.etaSec[1]);
+      a.etaSec[0] = etaNow(a.etaSec[0], fetchedAt[i]);
+      a.etaSec[1] = etaNow(a.etaSec[1], fetchedAt[i]);
     }
   }
   travelOnDeparture(ev);
   departedUser = armedUser;
-  departedAt = millis();
+  departedAt = openedAtMs;
   armedUser = -1;
+}
+
+// loop와 조회 한 건 직후에 처리한다. 보류된 문 열림도 원래 시각으로 판정한다.
+static bool processDeparture() {
+  uint32_t openedAt = 0;
+  bool opened = doorJustOpened(&openedAt);
+  if (armedUser < 0) return false;
+  uint32_t at = opened ? openedAt : (uint32_t)millis();
+  if (at - armedAt > DEPART_WINDOW_MS) { armedUser = -1; return false; }
+  if (!opened) return false;
+  sendDeparture(openedAt);
+  showMessage("HAVE A NICE DAY", "", C_GREEN, 3000, ST_IDLE);
+  return true;
 }
 
 void setup() {
@@ -212,18 +232,8 @@ void loop() {
   devicesLoop();
   netLoop();                                   // WiFi가 끊겼으면 다시 연결
   travelLoop();
+  if (processDeparture()) return;
   uint32_t now = millis();
-
-  // 태그 후 정해진 시간 안에 문이 열리면 외출
-  bool opened = doorJustOpened();
-  if (armedUser >= 0) {
-    if (now - armedAt > DEPART_WINDOW_MS) armedUser = -1;
-    else if (opened) {
-      sendDeparture();
-      showMessage("HAVE A NICE DAY", "", C_GREEN, 3000, ST_IDLE);
-      return;
-    }
-  }
 
   switch (state) {
     case ST_IDLE:

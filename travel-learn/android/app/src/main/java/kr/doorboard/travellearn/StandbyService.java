@@ -50,6 +50,7 @@ import kr.doorboard.travellearn.core.PhoneServerLogic;
 import kr.doorboard.travellearn.core.Proto;
 import kr.doorboard.travellearn.core.TripRecord;
 import kr.doorboard.travellearn.core.TripTracker;
+import kr.doorboard.travellearn.core.SyncRetry;
 
 /**
  * 상시 대기 서비스.
@@ -73,6 +74,9 @@ public class StandbyService extends Service
     public static final String ACTION_FAKE_DEPART = P + "FAKE_DEPART";
     public static final String ACTION_SYNC = P + "SYNC";
     public static final String ACTION_KEEPALIVE = P + "KEEPALIVE";
+    public static final String EXTRA_TRIP = P + "TRIP";
+    public static final String EXTRA_STOP = P + "STOP_ID";
+    public static final String EXTRA_ARRIVED_AT = P + "ARRIVED_AT";
 
     private static final int NOTIF_FGS = 1;
     private static final int NOTIF_PROMPT = 2;
@@ -81,7 +85,6 @@ public class StandbyService extends Service
     private static final String CH_TRIP = "trip";
 
     private static final long KEEPALIVE_MS = 60 * 60 * 1000L;
-    private static final long[] RETRY_MS = {5000L, 15000L, 60000L, 300000L};
 
     private static volatile StandbyService instance;
 
@@ -121,7 +124,7 @@ public class StandbyService extends Service
     private boolean started;
     private boolean locating;
     private boolean fgsLocation;
-    private volatile int retryIdx;
+    private final SyncRetry syncRetry = new SyncRetry();
     private double lastLat;
     private double lastLon;
     private float lastAcc = 999f;
@@ -182,7 +185,12 @@ public class StandbyService extends Service
         }
         if (ACTION_ARRIVE.equals(a)) {
             synchronized (lock) {
-                tracker.manualArrive(SystemClock.elapsedRealtime(), 0);
+                if (tracker.isActive() && tracker.current().trip == intent.getLongExtra(EXTRA_TRIP, 0)) {
+                    long at = intent.getLongExtra(EXTRA_ARRIVED_AT, SystemClock.elapsedRealtime());
+                    if (at >= tracker.t0() && at <= SystemClock.elapsedRealtime()) {
+                        tracker.manualArrive(at, intent.getIntExtra(EXTRA_STOP, 0));
+                    }
+                }
             }
         } else if (ACTION_CANCEL.equals(a)) {
             synchronized (lock) {
@@ -196,7 +204,7 @@ public class StandbyService extends Service
         } else if (ACTION_SYNC.equals(a)) {
             requestHelloSync("수동 동기화");
         } else if (ACTION_KEEPALIVE.equals(a)) {
-            retryIdx = 0;
+            syncRetry.reset();
             scheduleKeepalive();
             requestHelloSync("주기 점검");
         }
@@ -723,7 +731,7 @@ public class StandbyService extends Service
         @Override
         public void onAvailable(Network network) {
             wifiNet = network;
-            retryIdx = 0; // 새로 연결됐으니 재시도 간격을 처음부터
+            syncRetry.reset(); // 새로 연결됐으니 재시도 간격을 처음부터
             EventLog.add(StandbyService.this, "Wi-Fi 연결됨");
             worker.postDelayed(new Runnable() {
                 @Override
@@ -750,6 +758,7 @@ public class StandbyService extends Service
             wifiNet = null;
             wifiIp = "";
             atHome = false;
+            worker.removeCallbacks(retrySync);
             EventLog.add(StandbyService.this, "Wi-Fi 끊김");
             synchronized (lock) {
                 tracker.onWifiLost();
@@ -821,7 +830,7 @@ public class StandbyService extends Service
             atHome = false;
             lastError = "hello 실패: " + r.error;
             if (was || pending > 0) EventLog.add(this, lastError + " (" + why + ")");
-            scheduleRetry(pending > 0);
+            scheduleRetry();
             updateStandbyNotification();
             return;
         }
@@ -855,19 +864,18 @@ public class StandbyService extends Service
             }
         }
         if (allOk) {
-            retryIdx = 0;
+            syncRetry.reset();
             worker.removeCallbacks(retrySync);
         } else {
-            scheduleRetry(true);
+            scheduleRetry();
         }
         updateStandbyNotification();
     }
 
-    private void scheduleRetry(boolean hasPending) {
+    private void scheduleRetry() {
         worker.removeCallbacks(retrySync);
-        if (!hasPending || wifiNet == null) return;
-        if (retryIdx >= RETRY_MS.length) return; // 이후에는 다음 Wi-Fi 연결·주기 점검 때 다시 시도
-        worker.postDelayed(retrySync, RETRY_MS[retryIdx++]);
+        if (wifiNet == null) return;
+        worker.postDelayed(retrySync, syncRetry.nextDelayMs());
     }
 
     private PendingIntent keepalivePi() {
@@ -957,7 +965,7 @@ public class StandbyService extends Service
                 .setWhen(startWall)
                 .setContentIntent(activityPi(0))
                 .addAction(new Notification.Action.Builder((Icon) null, "도착",
-                        servicePi(ACTION_ARRIVE, 1)).build())
+                        activityPi(2)).build())
                 .addAction(new Notification.Action.Builder((Icon) null, "외출 취소",
                         servicePi(ACTION_CANCEL, 2)).build());
         if (Build.VERSION.SDK_INT >= 31) {
@@ -979,6 +987,14 @@ public class StandbyService extends Service
     }
 
     // ------------------------------------------------------------------ 화면 표시용
+
+    public long activeTripId() {
+        synchronized (lock) { return tracker.isActive() ? tracker.current().trip : 0; }
+    }
+
+    public List<Geo.Stop> manualArrivalStops() {
+        synchronized (lock) { return tracker.manualStops(); }
+    }
 
     static String statusKo(String st) {
         if (Proto.ST_ARRIVED.equals(st)) return "도착";

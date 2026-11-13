@@ -3,7 +3,9 @@ package kr.doorboard.travellearn;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.location.Location;
@@ -13,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.View;
@@ -59,6 +62,7 @@ public class MainActivity extends Activity {
     private final EditText[] stopPos = new EditText[Proto.MAX_STOPS];
     private final EditText[] stopRad = new EditText[Proto.MAX_STOPS];
     private boolean pendingStartTrip;
+    private boolean pendingArrive;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -73,18 +77,30 @@ public class MainActivity extends Activity {
         setContentView(sv);
         build();
         pendingStartTrip = getIntent().getIntExtra(EXTRA_START_TRIP, 0) == 1;
+        pendingArrive = getIntent().getIntExtra(EXTRA_START_TRIP, 0) == 2;
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent.getIntExtra(EXTRA_START_TRIP, 0) == 1) pendingStartTrip = true;
+        if (intent.getIntExtra(EXTRA_START_TRIP, 0) == 2) {
+            pendingArrive = true;
+            if (visible) {
+                pendingArrive = false;
+                requestManualArrival();
+            }
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         visible = true;
+        if (pendingArrive) {
+            pendingArrive = false;
+            requestManualArrival();
+        }
         if (pendingStartTrip) {
             // 출발 알림을 눌러 들어온 경우: 화면이 보이는 지금 측정을 시작한다.
             pendingStartTrip = false;
@@ -325,7 +341,7 @@ public class MainActivity extends Activity {
         button(t1, "도착", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (StandbyService.get() != null) sendToService(StandbyService.ACTION_ARRIVE);
+                requestManualArrival();
             }
         });
         button(t1, "취소", new View.OnClickListener() {
@@ -472,6 +488,33 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------------ 동작
+
+    private void requestManualArrival() {
+        final long arrivedAt = SystemClock.elapsedRealtime();
+        StandbyService svc = StandbyService.get();
+        final long trip = svc != null ? svc.activeTripId() : 0;
+        if (trip == 0) { toast("측정 중인 이동이 없습니다"); return; }
+        final List<Geo.Stop> choices = svc.manualArrivalStops();
+        if (choices.isEmpty()) { toast("도착을 기록할 정류장을 먼저 설정하세요"); return; }
+        if (choices.size() == 1) { confirmManualArrival(trip, choices.get(0).id, arrivedAt); return; }
+        String[] labels = new String[choices.size()];
+        for (int i = 0; i < choices.size(); i++) {
+            Geo.Stop s = choices.get(i);
+            labels[i] = "정류장 " + s.id + (s.name.isEmpty() ? "" : " · " + s.name);
+        }
+        new AlertDialog.Builder(this).setTitle("도착한 정류장 선택")
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface dialog, int which) {
+                        confirmManualArrival(trip, choices.get(which).id, arrivedAt);
+                    }
+                }).setNegativeButton("취소", null).show();
+    }
+
+    private void confirmManualArrival(long trip, int stop, long arrivedAt) {
+        startService(new Intent(this, StandbyService.class).setAction(StandbyService.ACTION_ARRIVE)
+                .putExtra(StandbyService.EXTRA_TRIP, trip).putExtra(StandbyService.EXTRA_STOP, stop)
+                .putExtra(StandbyService.EXTRA_ARRIVED_AT, arrivedAt));
+    }
 
     private void sendToService(String action) {
         try {

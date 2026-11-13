@@ -13,6 +13,7 @@ static bool doorOpen = false;
 static bool doorRaw = false;
 static uint32_t doorChangedAt = 0;
 static bool doorOpenedFlag = false;
+static uint32_t doorOpenedAt = 0;
 
 void devicesBegin() {
   pinMode(PIN_DOOR, INPUT_PULLUP);
@@ -20,6 +21,7 @@ void devicesBegin() {
   pinMode(PIN_DHT, INPUT_PULLUP);
   matrix.begin();
   doorRaw = doorOpen = (digitalRead(PIN_DOOR) == DOOR_OPEN_LEVEL);
+  doorOpenedFlag = false;
 }
 
 void devicesLoop() {
@@ -28,7 +30,10 @@ void devicesLoop() {
   if (raw != doorRaw) { doorRaw = raw; doorChangedAt = millis(); }
   if (raw != doorOpen && millis() - doorChangedAt >= 50) {
     doorOpen = raw;
-    if (doorOpen) doorOpenedFlag = true;
+    if (doorOpen && !doorOpenedFlag) {
+      doorOpenedAt = doorChangedAt;       // 조회가 끝난 시각 대신 실제 감지 시각을 보존
+      doorOpenedFlag = true;
+    }
   }
   if (dialDetachAt != 0 && (int32_t)(millis() - dialDetachAt) >= 0) {
     dial.detach();                        // 떨림과 대기 전류를 줄인다
@@ -38,8 +43,9 @@ void devicesLoop() {
 
 bool pirActive() { return analogRead(PIN_PIR) > PIR_THRESHOLD; }
 bool doorIsOpen() { return doorOpen; }
-bool doorJustOpened() {
+bool doorJustOpened(uint32_t* openedAtMs) {
   bool f = doorOpenedFlag;
+  if (f && openedAtMs) *openedAtMs = doorOpenedAt;
   doorOpenedFlag = false;
   return f;
 }

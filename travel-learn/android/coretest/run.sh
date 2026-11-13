@@ -4,7 +4,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/out"
+rm -rf "$OUT"
 mkdir -p "$OUT"
-javac -nowarn -encoding UTF-8 -d "$OUT" "$HERE"/../app/src/main/java/kr/doorboard/travellearn/core/*.java "$HERE"/*.java 2>&1 | grep -v '^Picked up' || true
-java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -cp "$OUT" "${1:-CoreSelfTest}" "${@:2}" 2>&1 | grep -v '^Picked up'
-exit "${PIPESTATUS[0]}"
+# 새 컴파일이 실패하면 이전 .class를 실행하지 않고 즉시 종료한다.
+javac -nowarn -encoding UTF-8 -d "$OUT" "$HERE"/../app/src/main/java/kr/doorboard/travellearn/core/*.java "$HERE"/*.java
+java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -cp "$OUT" "${1:-CoreSelfTest}" "${@:2}"

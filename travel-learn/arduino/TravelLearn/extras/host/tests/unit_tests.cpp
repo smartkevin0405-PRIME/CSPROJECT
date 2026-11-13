@@ -746,10 +746,12 @@ static void testSockets() {
   uint8_t ip[4] = { 127, 0, 0, 1 };
   tl.store().setPhone(1, ip, (uint16_t)ph.port);
   gDepOk = gDepFail = 0;
-  uint32_t trip = tl.notifyDeparture(1, 2, 1, 0, 420, -3);
+  uint32_t trip = tl.notifyDeparture(1, 2, 1, 0, 420, -3, 7000);
   pump(tl, 300);
   CHECK("출발 신호 전달·응답 MAC 확인", gDepOk == 1 && gDepFail == 0 && gDepTrip == trip && tl.phoneOnline(1) && ph.hits == 1);
   uint32_t v;
+  CHECK("조회 중 문 열림: 최초 전송에도 기존 경과 7초 반영",
+        tlJsonGetU32(ph.lastBody.c_str(), "age_ms", &v) && v >= 7000 && v < 8500);
   CHECK("출발 신호 본문(선택 키 포함)", ph.lastPath == "/v1/depart" && tlJsonGetU32(ph.lastBody.c_str(), "trip", &v) && v == trip
         && tlJsonGetU32(ph.lastBody.c_str(), "stop", &v) && v == 2 && tlJsonGetU32(ph.lastBody.c_str(), "wx", &v) && v == 1
         && tlJsonGetU32(ph.lastBody.c_str(), "try", &v) && v == 1 && tlJsonGetU32(ph.lastBody.c_str(), "eta_s", &v) && v == 420

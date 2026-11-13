@@ -46,6 +46,8 @@ Arduino IDE는 GCC 7.2.1을 쓰므로 수백 바이트 다를 수 있다. **실�
 - 힙은 8,192바이트에서 끝나지 않는다. 코어의 `_sbrk`는 전역 변수 바로 뒤부터 스택 예약 바로 아래(`__HeapLimit`)까지 늘어난다.
 - Wi-Fi 연결 하나마다 수신 버퍼 1,024바이트, EEPROM 기록 순간에 1,024바이트를 힙에서 잡는다. 실제 힙 최고 사용량은 재지 않았다.
 
+RAM·스택 표는 리뷰 수정 전(`3ffa1a1`)의 측정값이다. 문 열림 시각 보존과 조회 중 출발 처리 수정 후의 보드용 수치는 다시 측정해야 한다.
+
 ### 메인 스택 (1,024바이트)
 
 - 코어 설정 `BSP_CFG_STACK_MAIN_BYTES` = 0x400. 스케치에서 바꿀 수 없다.
@@ -109,7 +111,7 @@ Arduino IDE는 GCC 7.2.1을 쓰므로 수백 바이트 다를 수 있다. **실�
 | --- | --- |
 | `travelBegin()` | `tl.begin()`, `tl.setUserKey()`, `tl.setDefaultWalk()` |
 | `travelLoop()` (`loop()`와, 태그 후 조회 한 건이 끝날 때마다) | `tl.loop()` |
-| `travelOnDeparture(ev)` | `tl.notifyDeparture(user, stop, wx, tb, etaS, tempC)` |
+| `travelOnDeparture(ev)` | `tl.notifyDeparture(user, stop, wx, tb, etaS, tempC, ageMs)` |
 | `travelGetSlackSec(...)` | `tl.slack(user, stop, wx, tb, etaS)`의 여유 시간 |
 
 합칠 때 확인할 것

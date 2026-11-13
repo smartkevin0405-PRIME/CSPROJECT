@@ -9,7 +9,7 @@ void devicesLoop();                       // loop()마다 호출 (문 디바운�
 
 bool pirActive();                         // 사람 움직임이 있으면 true
 bool doorIsOpen();                        // 지금 문이 열려 있으면 true
-bool doorJustOpened();                    // 닫힘→열림으로 바뀐 순간 한 번만 true
+bool doorJustOpened(uint32_t* openedAtMs = nullptr); // 최초 열림 시각도 함께 꺼낸다(millis)
 bool dhtRead(int8_t& tempC, uint8_t& humidity);   // 실내 온습도. 실패하면 false
 
 void matrixShowTemp(int8_t tempC);        // 내장 LED 매트릭스에 기온 숫자

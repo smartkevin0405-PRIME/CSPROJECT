@@ -75,7 +75,8 @@ void travelOnDeparture(const DepartureEvent& ev) {
   uint8_t wx = TravelLearn::wxFromPty(ev.pty);
   uint8_t tb = timeBand(ev.epochSec);
   // 정류장은 아직 모르므로 0 (폰이 그 사용자의 모든 정류장을 감시한다)
-  uint32_t trip = tl.notifyDeparture(ev.userId + 1, 0, wx, tb, eta, ev.outdoorTempC);
+  uint32_t trip = tl.notifyDeparture(ev.userId + 1, 0, wx, tb, eta, ev.outdoorTempC,
+                                     (uint32_t)(millis() - ev.uptimeMs));
   Serial.print(F("[travel] departure user="));
   Serial.print(ev.userId + 1);
   Serial.print(F(" wx="));
