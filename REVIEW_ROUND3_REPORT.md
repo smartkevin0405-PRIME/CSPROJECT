@@ -89,7 +89,7 @@ JSON 문자열 이스케이프 시험 통과
 - 2차 보고서의 사람 확인 항목 V01~V08과 `DEMO_MODE` 0 전환은 그대로 남아 있다.
 
 ## 커밋 목록
-`git log --oneline` (이 보고서를 넣는 커밋 직전 기준)
+`git log --oneline` (보고서 커밋 2개를 빼고, 코드·문서 커밋만)
 
 ```
 ae979bf [C] 문서: C07
@@ -98,4 +98,4 @@ ae979bf [C] 문서: C07
 ea8aaf9 Merge pull request #5 from smartkevin0405-PRIME/claude/new-session-4frzea
 ```
 
-PR 주소: PR_URL_PLACEHOLDER
+PR 주소: https://github.com/smartkevin0405-PRIME/CSPROJECT/pull/6 (`fix/review-round3` → `fix/review-departure-sync-arrival`)
