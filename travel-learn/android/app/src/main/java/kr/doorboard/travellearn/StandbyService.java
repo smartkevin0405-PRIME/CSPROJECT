@@ -50,6 +50,7 @@ import kr.doorboard.travellearn.core.PhoneServerLogic;
 import kr.doorboard.travellearn.core.Proto;
 import kr.doorboard.travellearn.core.TripRecord;
 import kr.doorboard.travellearn.core.TripTracker;
+import kr.doorboard.travellearn.core.SyncRetry;
 
 /**
  * 상시 대기 서비스.
@@ -73,6 +74,9 @@ public class StandbyService extends Service
     public static final String ACTION_FAKE_DEPART = P + "FAKE_DEPART";
     public static final String ACTION_SYNC = P + "SYNC";
     public static final String ACTION_KEEPALIVE = P + "KEEPALIVE";
+    public static final String EXTRA_TRIP = P + "TRIP";
+    public static final String EXTRA_STOP = P + "STOP_ID";
+    public static final String EXTRA_ARRIVED_AT = P + "ARRIVED_AT";
 
     private static final int NOTIF_FGS = 1;
     private static final int NOTIF_PROMPT = 2;
@@ -81,7 +85,7 @@ public class StandbyService extends Service
     private static final String CH_TRIP = "trip";
 
     private static final long KEEPALIVE_MS = 60 * 60 * 1000L;
-    private static final long[] RETRY_MS = {5000L, 15000L, 60000L, 300000L};
+    private static final long HOME_CONFIRM_MS = 60 * 1000L;   // 다시 붙은 Wi-Fi가 이만큼 유지돼야 귀가로 본다 (N1)
 
     private static volatile StandbyService instance;
 
@@ -110,6 +114,8 @@ public class StandbyService extends Service
     private volatile long lastContactWall;
     private volatile String lastError = "";
     private volatile boolean serverUp;
+    private volatile long netGen;        // Wi-Fi가 붙거나 끊길 때마다 1 증가 (B07)
+    private volatile long wifiSinceMs;   // 지금 Wi-Fi에 붙은 시각(elapsedRealtime), 끊겼으면 0 (N1)
 
     private final TripTracker.Config cfg = new TripTracker.Config();
     private final List<Geo.Stop> stops = new ArrayList<Geo.Stop>();
@@ -117,11 +123,12 @@ public class StandbyService extends Service
     private TripRecord waitRec;
     private long waitT0;
     private boolean savedLeft;
+    private boolean savedWifiLost;
 
     private boolean started;
     private boolean locating;
     private boolean fgsLocation;
-    private volatile int retryIdx;
+    private final SyncRetry syncRetry = new SyncRetry();
     private double lastLat;
     private double lastLon;
     private float lastAcc = 999f;
@@ -182,7 +189,12 @@ public class StandbyService extends Service
         }
         if (ACTION_ARRIVE.equals(a)) {
             synchronized (lock) {
-                tracker.manualArrive(SystemClock.elapsedRealtime(), 0);
+                if (tracker.isActive() && tracker.current().trip == intent.getLongExtra(EXTRA_TRIP, 0)) {
+                    long at = intent.getLongExtra(EXTRA_ARRIVED_AT, SystemClock.elapsedRealtime());
+                    if (at >= tracker.t0() && at <= SystemClock.elapsedRealtime()) {
+                        tracker.manualArrive(at, intent.getIntExtra(EXTRA_STOP, 0));
+                    }
+                }
             }
         } else if (ACTION_CANCEL.equals(a)) {
             synchronized (lock) {
@@ -196,7 +208,7 @@ public class StandbyService extends Service
         } else if (ACTION_SYNC.equals(a)) {
             requestHelloSync("수동 동기화");
         } else if (ACTION_KEEPALIVE.equals(a)) {
-            retryIdx = 0;
+            syncRetry.reset();
             scheduleKeepalive();
             requestHelloSync("주기 점검");
         }
@@ -365,6 +377,17 @@ public class StandbyService extends Service
         EventLog.add(this, "위치 측정 중단");
     }
 
+    /** lock을 잡은 상태에서 호출. 집을 떠남·Wi-Fi 끊김 상태가 바뀌었으면 저장한다 (B06). */
+    private void saveActiveIfChanged() {
+        if (!tracker.isActive()) return;
+        if (tracker.hasLeftHome() != savedLeft || tracker.hasLostWifi() != savedWifiLost) {
+            savedLeft = tracker.hasLeftHome();
+            savedWifiLost = tracker.hasLostWifi();
+            Prefs.saveActive(this, tracker.current().trip, tracker.t0(), bootCount(),
+                    savedLeft, savedWifiLost);
+        }
+    }
+
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
@@ -372,11 +395,13 @@ public class StandbyService extends Service
                 if (!tracker.isActive()) return;
                 tracker.onTick(SystemClock.elapsedRealtime(), wifiNet != null && atHome);
                 if (!tracker.isActive()) return;
-                if (tracker.hasLeftHome() != savedLeft) {
-                    savedLeft = tracker.hasLeftHome();
-                    Prefs.saveActive(StandbyService.this, tracker.current().trip, tracker.t0(),
-                            bootCount(), savedLeft);
+                long nowMs = SystemClock.elapsedRealtime();
+                // 집 Wi-Fi에 다시 붙어 현관판과 통신되고, 그 연결이 1분 넘게 유지될 때만 "도착 전 귀가"로 본다 (B07, N1)
+                if (wifiNet != null && atHome && wifiSinceMs != 0 && nowMs - wifiSinceMs >= HOME_CONFIRM_MS) {
+                    tracker.onHomeReturned();
+                    if (!tracker.isActive()) return;
                 }
+                saveActiveIfChanged();
             }
             worker.postDelayed(this, 5000L);
         }
@@ -408,9 +433,15 @@ public class StandbyService extends Service
 
     private String handleDepart(PhoneServerLogic.Depart d, long receivedMs, int src) {
         synchronized (lock) {
-            if (db.exists(d.trip)) {
-                EventLog.add(this, "출발 신호 중복 #" + d.trip + " (시도 " + d.tryNo + ")");
-                return "dup";
+            TripRecord old = db.find(d.trip);
+            if (old != null) {
+                boolean recent = System.currentTimeMillis() - old.createdMs < 10 * 60 * 1000L;
+                if (recent || !old.synced || !db.retire(d.trip)) {
+                    EventLog.add(this, "출발 신호 중복 #" + d.trip + " (시도 " + d.tryNo + ")");
+                    return "dup";
+                }
+                // 다른 현관판이나 초기화 전 현관판이 같은 ID를 쓴 경우: 옛 기록을 보관하고 새 출발로 받는다 (N4)
+                EventLog.add(this, "같은 이동 ID #" + d.trip + "의 옛 기록을 보관 처리하고 새 출발로 받음");
             }
             TripRecord r = new TripRecord();
             r.trip = d.trip;
@@ -444,7 +475,8 @@ public class StandbyService extends Service
                 db.insert(r);
                 tracker.start(r, t0);
                 savedLeft = false;
-                Prefs.saveActive(this, r.trip, t0, bootCount(), false);
+                savedWifiLost = false;
+                Prefs.saveActive(this, r.trip, t0, bootCount(), false, false);
                 main.post(beginTracking);
                 EventLog.add(this, "출발 신호 수신 #" + r.trip + " 경과 " + d.ageMs + "ms, 시도 "
                         + d.tryNo + " → 측정 시작");
@@ -522,7 +554,8 @@ public class StandbyService extends Service
             db.update(r);
             tracker.start(r, t0);
             savedLeft = false;
-            Prefs.saveActive(this, r.trip, t0, bootCount(), false);
+            savedWifiLost = false;
+            Prefs.saveActive(this, r.trip, t0, bootCount(), false, false);
             main.post(beginTracking);
             EventLog.add(this, "사용자 확인으로 측정 시작 #" + r.trip);
         }
@@ -616,7 +649,8 @@ public class StandbyService extends Service
                     stops.addAll(Prefs.stops(this));
                     tracker.start(r, t0);
                     savedLeft = Prefs.activeLeft(this);
-                    tracker.restoreLeftHome(savedLeft);
+                    savedWifiLost = Prefs.activeWifiLost(this);
+                    tracker.restoreState(savedLeft, savedWifiLost);   // 두 상태를 따로 복원 (B06)
                     main.post(beginTracking);
                     EventLog.add(this, "진행 중이던 이동 #" + r.trip + " 이어서 측정");
                 } else {
@@ -688,10 +722,11 @@ public class StandbyService extends Service
 
     private void serve(Socket s, long received) {
         try {
-            s.setSoTimeout(3000);
+            s.setSoTimeout(1000);
+            long deadline = System.nanoTime() + 3000L * 1000000L;   // 요청 전체를 3초 안에 (B16)
             HttpMini.Response resp;
             try {
-                HttpMini.Request req = HttpMini.readRequest(s.getInputStream(), Proto.MAX_BODY);
+                HttpMini.Request req = HttpMini.readRequest(s.getInputStream(), Proto.MAX_BODY, deadline);
                 resp = logic.handle(req, received);
             } catch (HttpMini.HttpError e) {
                 resp = new HttpMini.Response(e.status, "{\"ok\":0,\"err\":\"" + e.err + "\"}");
@@ -723,7 +758,9 @@ public class StandbyService extends Service
         @Override
         public void onAvailable(Network network) {
             wifiNet = network;
-            retryIdx = 0; // 새로 연결됐으니 재시도 간격을 처음부터
+            netGen++;                                        // B07
+            wifiSinceMs = SystemClock.elapsedRealtime();     // N1
+            syncRetry.reset(); // 새로 연결됐으니 재시도 간격을 처음부터
             EventLog.add(StandbyService.this, "Wi-Fi 연결됨");
             worker.postDelayed(new Runnable() {
                 @Override
@@ -740,7 +777,7 @@ public class StandbyService extends Service
             if (!ip.isEmpty() && !ip.equals(wifiIp)) {
                 boolean had = !wifiIp.isEmpty();
                 wifiIp = ip;
-                if (had) requestHelloSync("폰 주소 변경");
+                requestHelloSync(had ? "폰 주소 변경" : "Wi-Fi 주소 확보");   // 첫 주소가 늦게 생겨도 등록 (B11)
             }
         }
 
@@ -748,11 +785,15 @@ public class StandbyService extends Service
         public void onLost(Network network) {
             if (!network.equals(wifiNet)) return;
             wifiNet = null;
+            netGen++;          // B07
+            wifiSinceMs = 0;   // N1
             wifiIp = "";
             atHome = false;
+            worker.removeCallbacks(retrySync);
             EventLog.add(StandbyService.this, "Wi-Fi 끊김");
             synchronized (lock) {
                 tracker.onWifiLost();
+                saveActiveIfChanged();   // B06
             }
             updateStandbyNotification();
         }
@@ -791,6 +832,8 @@ public class StandbyService extends Service
 
     /** 네트워크 전용 스레드에서 실행. hello가 성공하면 "집에 있음"으로 보고 미전송 기록을 보낸다. */
     private void helloSync(String why) {
+        final int user = Prefs.user(this);   // 이 동기화가 쓰는 사용자 번호 (B02)
+        final long gen = netGen;   // 이 요청을 시작할 때의 연결 세대 (B07)
         Network n = wifiNet;
         String host = Prefs.boardHost(this);
         byte[] key = Prefs.key(this);
@@ -807,67 +850,81 @@ public class StandbyService extends Service
             ip = ipv4Of(cm.getLinkProperties(n));
             wifiIp = ip;
         }
-        if (ip.isEmpty()) return;
+        if (ip.isEmpty()) {
+            scheduleRetry();   // 주소가 아직 없으면 잠시 뒤 다시 (B11)
+            return;
+        }
 
         // Wi-Fi 망에 묶인 소켓을 쓴다(모바일 데이터가 기본 망이어도 집 안 주소로 나가게).
         BoardClient c = new BoardClient(n.getSocketFactory(), host, Prefs.boardPort(this),
-                Prefs.user(this), key);
+                user, key);
         long now = System.currentTimeMillis();
         int tz = TimeZone.getDefault().getOffset(now) / 60000;
-        int pending = db.countUnsynced();
+        int pending = db.countUnsynced(user);
         BoardClient.Result r = c.hello(ip, Prefs.phonePort(this), now / 1000L, tz, pending);
         if (!r.ok) {
             boolean was = atHome;
             atHome = false;
             lastError = "hello 실패: " + r.error;
             if (was || pending > 0) EventLog.add(this, lastError + " (" + why + ")");
-            scheduleRetry(pending > 0);
+            scheduleRetry();
             updateStandbyNotification();
+            return;
+        }
+        if (gen != netGen || wifiNet != n) {   // 요청 사이에 Wi-Fi가 바뀌었다: 이전 연결의 응답은 버린다 (B07)
+            EventLog.add(this, "이전 Wi-Fi 연결의 hello 응답 무시");
             return;
         }
         if (!atHome) EventLog.add(this, "현관판 연결 확인(" + why + "), 미전송 " + pending + "건");
         atHome = true;
         lastContactWall = now;
         lastError = "";
-        synchronized (lock) {
-            tracker.onHomeReturned();
-        }
+        // "도착 전 귀가" 판정은 tick에서 Wi-Fi가 1분 넘게 유지됐을 때 한다 (N1)
 
-        List<TripRecord> list = db.unsynced();
         boolean allOk = true;
-        for (int i = 0; i < list.size(); i++) {
-            TripRecord rec = list.get(i);
-            BoardClient.Result tr = c.postTrip(rec);
-            if (!tr.ok) {
-                lastError = "기록 #" + rec.trip + " 전송 실패: " + tr.error;
-                EventLog.add(this, lastError);
-                allOk = false;
-                break;
+        boolean more = false;
+        for (int batch = 0; ; batch++) {
+            List<TripRecord> list = db.unsynced(user);
+            if (list.isEmpty()) break;
+            for (int i = 0; i < list.size(); i++) {
+                TripRecord rec = list.get(i);
+                BoardClient.Result tr = c.postTrip(rec);
+                if (!tr.ok) {
+                    lastError = "기록 #" + rec.trip + " 전송 실패: " + tr.error;
+                    EventLog.add(this, lastError);
+                    allOk = false;
+                    break;
+                }
+                db.markSynced(rec.trip);
+                if (tr.getLong("applied", 0) == 1) {
+                    EventLog.add(this, "기록 #" + rec.trip + " 저장 완료 · 표본 " + tr.getLong("n", 0)
+                            + "개, 평균 " + tr.getLong("mean_ds", 0) / 10 + "초, 편차 "
+                            + tr.getLong("sd_ds", 0) / 10 + "초");
+                } else {
+                    EventLog.add(this, "기록 #" + rec.trip + " 저장 완료 · 통계 미반영("
+                            + tr.getString("why", "?") + ")");
+                }
             }
-            db.markSynced(rec.trip);
-            if (tr.getLong("applied", 0) == 1) {
-                EventLog.add(this, "기록 #" + rec.trip + " 저장 완료 · 표본 " + tr.getLong("n", 0)
-                        + "개, 평균 " + tr.getLong("mean_ds", 0) / 10 + "초, 편차 "
-                        + tr.getLong("sd_ds", 0) / 10 + "초");
-            } else {
-                EventLog.add(this, "기록 #" + rec.trip + " 저장 완료 · 통계 미반영("
-                        + tr.getString("why", "?") + ")");
-            }
+            if (!allOk) break;
+            if (list.size() < 50) break;              // 마지막 묶음이었다
+            if (batch >= 9) { more = true; break; }   // 한 번에 최대 500건. 나머지는 곧 이어서 (B10)
         }
-        if (allOk) {
-            retryIdx = 0;
+        if (!allOk) {
+            scheduleRetry();
+        } else if (more) {
             worker.removeCallbacks(retrySync);
+            worker.postDelayed(retrySync, 1000L);     // B10
         } else {
-            scheduleRetry(true);
+            syncRetry.reset();
+            worker.removeCallbacks(retrySync);
         }
         updateStandbyNotification();
     }
 
-    private void scheduleRetry(boolean hasPending) {
+    private void scheduleRetry() {
         worker.removeCallbacks(retrySync);
-        if (!hasPending || wifiNet == null) return;
-        if (retryIdx >= RETRY_MS.length) return; // 이후에는 다음 Wi-Fi 연결·주기 점검 때 다시 시도
-        worker.postDelayed(retrySync, RETRY_MS[retryIdx++]);
+        if (wifiNet == null) return;
+        worker.postDelayed(retrySync, syncRetry.nextDelayMs());
     }
 
     private PendingIntent keepalivePi() {
@@ -914,7 +971,7 @@ public class StandbyService extends Service
         if (wifiNet != null && atHome) text = "현관판 연결됨 · 출발 신호 대기";
         else if (wifiNet != null) text = "Wi-Fi 연결됨 · 현관판 미확인";
         else text = "집 밖 · 귀가하면 동기화";
-        int pending = db.countUnsynced();
+        int pending = db.countUnsynced(Prefs.user(this));
         if (pending > 0) text += " · 미전송 " + pending + "건";
         Notification.Builder b = new Notification.Builder(this, CH_STANDBY)
                 .setSmallIcon(R.drawable.ic_stat)
@@ -957,7 +1014,7 @@ public class StandbyService extends Service
                 .setWhen(startWall)
                 .setContentIntent(activityPi(0))
                 .addAction(new Notification.Action.Builder((Icon) null, "도착",
-                        servicePi(ACTION_ARRIVE, 1)).build())
+                        activityPi(2)).build())
                 .addAction(new Notification.Action.Builder((Icon) null, "외출 취소",
                         servicePi(ACTION_CANCEL, 2)).build());
         if (Build.VERSION.SDK_INT >= 31) {
@@ -979,6 +1036,14 @@ public class StandbyService extends Service
     }
 
     // ------------------------------------------------------------------ 화면 표시용
+
+    public long activeTripId() {
+        synchronized (lock) { return tracker.isActive() ? tracker.current().trip : 0; }
+    }
+
+    public List<Geo.Stop> manualArrivalStops() {
+        synchronized (lock) { return tracker.manualStops(); }
+    }
 
     static String statusKo(String st) {
         if (Proto.ST_ARRIVED.equals(st)) return "도착";
@@ -1015,7 +1080,12 @@ public class StandbyService extends Service
                 sb.append("출발 신호 확인 대기 #").append(waitRec.trip).append('\n');
             }
         }
-        sb.append("미전송 기록: ").append(db.countUnsynced()).append("건");
+        int me = Prefs.user(this);
+        sb.append("미전송 기록: ").append(db.countUnsynced(me)).append("건");
+        int others = db.countUnsyncedOtherUsers(me);
+        if (others > 0) {
+            sb.append(" (다른 사용자 번호의 기록 ").append(others).append("건은 전송 안 함)");   // B02
+        }
         if (!lastError.isEmpty()) sb.append("\n최근 오류: ").append(lastError);
         return sb.toString();
     }

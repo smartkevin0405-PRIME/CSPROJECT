@@ -28,9 +28,9 @@ class TravelLearn {
   // 표본이 없을 때 쓸 초기 이동 시간(초). setup()에서 부른다(EEPROM에 저장하지 않음).
   void setDefaultWalk(uint8_t user, uint8_t stop, uint16_t seconds);
 
-  // RFID 확인 뒤 문 열림을 감지했을 때 부른다. 반환: 이동 ID(0이면 거절)
+  // RFID 확인 뒤 문 열림을 감지했을 때 부른다. ageMs는 감지 후 경과 시간. 반환: 이동 ID(0이면 거절)
   uint32_t notifyDeparture(uint8_t user, uint8_t stopHint, uint8_t wx, uint8_t tb,
-                           int32_t etaS = -1, int16_t tempC = -128);
+                           int32_t etaS = -1, int16_t tempC = -128, uint32_t ageMs = 0);
   // 외출 취소로 판단했을 때 부른다.
   void cancelDeparture(uint8_t user);
 
@@ -81,6 +81,7 @@ class TravelLearn {
   WiFiServer _server;
   bool _begun = false;
   uint16_t _seq = 0;                       // 부팅 후 이동 순번
+  uint32_t boardLimit() const;             // 이 현관판이 지금까지 발급한 가장 큰 이동 ID (C01)
   uint8_t _rr = 0;                         // 사용자 순환 처리 위치
   uint8_t _keys[TL_MAX_USERS][16] = {};
   bool _hasKey[TL_MAX_USERS] = {};

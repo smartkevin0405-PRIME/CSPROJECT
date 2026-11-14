@@ -18,6 +18,7 @@ TARGET_SDK=37
 W="$HERE/build-manual"
 mkdir -p "$W/gen" "$W/classes" "$W/dex"
 find "$W/classes" -name '*.class' -delete
+rm -f "$OUT_APK" "$OUT_APK.tmp"   # 이전 결과를 새 결과로 착각하지 않게 먼저 지운다 (B17)
 
 # 1) 매니페스트에 package·uses-sdk를 넣은 사본을 만든다(Gradle은 build.gradle에서 넣어 준다).
 python3 - "$HERE/app/src/main/AndroidManifest.xml" "$W/AndroidManifest.xml" "$PKG" "$MIN_SDK" "$TARGET_SDK" <<'PY'
@@ -39,8 +40,13 @@ aapt2 link -o "$W/base.apk" -I "$LINK_JAR" --manifest "$W/AndroidManifest.xml" -
 
 # 3) 자바 컴파일(자바 8 문법, 람다 미사용)
 find "$HERE/app/src/main/java" "$W/gen" -name '*.java' > "$W/sources.txt"
-javac -nowarn -encoding UTF-8 -source 8 -target 8 -bootclasspath "$COMPILE_JAR" \
-  -d "$W/classes" @"$W/sources.txt" 2>&1 | grep -v -e '^Picked up' -e '^warning:' -e '^Note:' -e '^[0-9]* warning' || true
+if ! javac -nowarn -encoding UTF-8 -source 8 -target 8 -bootclasspath "$COMPILE_JAR" \
+     -d "$W/classes" @"$W/sources.txt" > "$W/javac.log" 2>&1; then
+  grep -v -e '^Picked up' "$W/javac.log" >&2 || true
+  echo "오류: 자바 컴파일 실패" >&2
+  exit 1
+fi
+grep -v -e '^Picked up' -e '^warning:' -e '^Note:' -e '^[0-9]* warning' "$W/javac.log" || true   # 경고만 보여 준다 (B17)
 test -f "$W/classes/kr/doorboard/travellearn/StandbyService.class"
 
 # 4) dex 변환
@@ -56,8 +62,20 @@ if [ ! -f "$KS" ]; then
     -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=TravelLearn Debug" >/dev/null 2>&1
 fi
 mkdir -p "$(dirname "$OUT_APK")"
-apksigner sign --ks "$KS" --ks-pass pass:android --key-pass pass:android \
-  --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled true \
-  --min-sdk-version "$MIN_SDK" --out "$OUT_APK" "$W/aligned.apk" 2>&1 | grep -v '^Picked up' || true
-apksigner verify --min-sdk-version "$MIN_SDK" "$OUT_APK" 2>&1 | grep -v '^Picked up' || true
+# 임시 파일에 서명·검증한 뒤, 둘 다 성공해야 최종 파일로 옮긴다 (B17)
+if ! apksigner sign --ks "$KS" --ks-pass pass:android --key-pass pass:android \
+     --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled true \
+     --min-sdk-version "$MIN_SDK" --out "$OUT_APK.tmp" "$W/aligned.apk" > "$W/sign.log" 2>&1; then
+  grep -v '^Picked up' "$W/sign.log" >&2 || true
+  echo "오류: APK 서명 실패" >&2
+  rm -f "$OUT_APK.tmp"
+  exit 1
+fi
+if ! apksigner verify --min-sdk-version "$MIN_SDK" "$OUT_APK.tmp" > "$W/verify.log" 2>&1; then
+  grep -v '^Picked up' "$W/verify.log" >&2 || true
+  echo "오류: APK 서명 검증 실패" >&2
+  rm -f "$OUT_APK.tmp"
+  exit 1
+fi
+mv -f "$OUT_APK.tmp" "$OUT_APK"
 echo "APK: $OUT_APK"

@@ -25,6 +25,8 @@ public final class TripRecord {
     /** 폰 내부 메모(취소 이유 등). 망으로 보내지 않는다. */
     public String note = "";
     public boolean synced;
+    /** 이 기기에서 기록을 처음 만든 벽시계 시각(ms). DB에서 읽을 때만 채운다 (N4). */
+    public long createdMs;
 
     public boolean isFinished() {
         return !Proto.ST_ACTIVE.equals(status) && !Proto.ST_WAIT_USER.equals(status);

@@ -96,7 +96,7 @@ void TravelLearn::dumpStats(Print& out) {
 // ---------------------------------------------------------------- 출발·취소
 
 uint32_t TravelLearn::notifyDeparture(uint8_t user, uint8_t stopHint, uint8_t wx, uint8_t tb,
-                                      int32_t etaS, int16_t tempC) {
+                                      int32_t etaS, int16_t tempC, uint32_t ageMs) {
   if (!_begun || user < 1 || user > TL_MAX_USERS) return 0;
   if (stopHint > TL_MAX_STOPS) stopHint = 0;
   if (wx >= TL_NUM_WX) wx = 0;
@@ -109,8 +109,8 @@ uint32_t TravelLearn::notifyDeparture(uint8_t user, uint8_t stopHint, uint8_t wx
   if (_seq == 0) _seq = 1;
   Pending& p = _pend[user - 1];
   p.trip = ((uint32_t)(_store.boot() & 0x7FFF) << 16) | _seq;
-  p.t0Ms = millis();
-  p.nextTryMs = p.t0Ms;
+  p.nextTryMs = millis();
+  p.t0Ms = p.nextTryMs - ageMs;              // API 조회 중 감지한 문 열림 시각까지 보정
   p.etaS = etaS;
   p.tempC = tempC;
   p.stop = stopHint; p.wx = wx; p.tb = tb;
@@ -120,12 +120,16 @@ uint32_t TravelLearn::notifyDeparture(uint8_t user, uint8_t stopHint, uint8_t wx
   return p.trip;
 }
 
+uint32_t TravelLearn::boardLimit() const {
+  return ((uint32_t)(_store.boot() & 0x7FFF) << 16) | _seq;
+}
+
 void TravelLearn::cancelDeparture(uint8_t user) {
   if (user < 1 || user > TL_MAX_USERS) return;
   Pending& p = _pend[user - 1];
-  if (p.state == ST_SENDING) {
-    // 아직 전달 확인을 못 받았어도 폰이 받았을 수 있으므로 취소 신호는 보낸다.
-    if (_cbDepart) _cbDepart(user, p.trip, false);
+  if (p.state == ST_SENDING || p.state == ST_FAILED) {
+    // 전달 확인을 못 받았어도(응답 유실 포함) 폰이 받았을 수 있으므로 취소 신호는 보낸다. (B03)
+    if (p.state == ST_SENDING && _cbDepart) _cbDepart(user, p.trip, false);
   } else if (p.state != ST_DELIVERED) {
     return;
   }
@@ -342,7 +346,7 @@ int TravelLearn::handleTrips(const TlHttpReq* req, char* out, size_t cap) {
   uint8_t u = (uint8_t)user;
 
   // 1) 중복: 이미 처리한 이동 ID
-  if (_store.seenTrip(u, trip)) {
+  if (_store.seenTrip(u, trip, boardLimit())) {
     snprintf(out, cap, "{\"ok\":1,\"trip\":%lu,\"stored\":1,\"applied\":0,\"why\":\"dup\"}", (unsigned long)trip);
     return 200;
   }
@@ -368,7 +372,7 @@ int TravelLearn::handleTrips(const TlHttpReq* req, char* out, size_t cap) {
   }
 
   // 3) 중복 방지 목록에 넣고 EEPROM에 기록한다. 기록이 끝나야 stored:1을 보낸다.
-  _store.addTrip(u, trip);
+  _store.addTrip(u, trip, boardLimit());
   if (!_store.commit()) {
     _store.rollback();
     return errBody(out, cap, 503, "busy");

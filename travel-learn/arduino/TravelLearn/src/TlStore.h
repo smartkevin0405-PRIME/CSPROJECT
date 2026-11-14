@@ -14,7 +14,8 @@
 // ---- 이미지 배치(바이트 오프셋) ----
 #define TL_IMG_HDR 16                                   // 머리말
 #define TL_REG_REC 8                                    // 폰 주소 1건
-#define TL_DEDUP_REC (TL_DEDUP_RING * 4 + 1)            // 사용자 1명의 이동 ID 목록 + 다음 위치
+#define TL_DEDUP_HW_OFF (TL_DEDUP_RING * 4 + 1)         // 레코드 안에서 최고값 2개(현관판 ID, 폰 ID)가 시작하는 위치 (B15)
+#define TL_DEDUP_REC (TL_DEDUP_HW_OFF + 8)              // 사용자 1명: 최근 이동 ID 목록 + 다음 위치 + 최고값 2개
 #define TL_CELL_REC 6                                   // 통계 1칸
 #define TL_OFF_REG TL_IMG_HDR
 #define TL_OFF_DEDUP (TL_OFF_REG + TL_MAX_USERS * TL_REG_REC)
@@ -23,7 +24,7 @@
 #define TL_IMG_SIZE (TL_OFF_CRC + 4)
 // 한 벌이 차지하는 EEPROM 크기(블록 단위로 올림)
 #define TL_COPY_STRIDE (((TL_IMG_SIZE + TL_EE_BLOCK - 1) / TL_EE_BLOCK) * TL_EE_BLOCK)
-#define TL_LAYOUT_VER 1
+#define TL_LAYOUT_VER 2
 
 static_assert(TL_EE_BASE % TL_EE_BLOCK == 0, "TL_EE_BASE must be a multiple of 1024");
 static_assert(2 * TL_COPY_STRIDE <= TL_EE_SIZE, "TL_EE_SIZE too small for two image copies");
@@ -61,8 +62,9 @@ class TlStore {
   bool setPhone(uint8_t user, const uint8_t ip[4], uint16_t port);   // 값이 바뀌었으면 true
 
   // 중복 방지 목록
-  bool seenTrip(uint8_t user, uint32_t trip) const;
-  void addTrip(uint8_t user, uint32_t trip);
+  // boardLimit: 이 현관판이 지금까지 발급한 가장 큰 현관판 ID. 이보다 큰 현관판 ID는 다른 계보로 본다 (C01)
+  bool seenTrip(uint8_t user, uint32_t trip, uint32_t boardLimit = 0xFFFFFFFFUL) const;
+  void addTrip(uint8_t user, uint32_t trip, uint32_t boardLimit = 0xFFFFFFFFUL);
 
   // RAM 이미지를 EEPROM의 안 쓰는 벌에 쓰고 되읽어 확인한다.
   bool commit();

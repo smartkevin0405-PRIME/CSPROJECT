@@ -2,6 +2,7 @@
 package kr.doorboard.travellearn.core;
 
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * 이동 한 건의 상태 기계. Android API에 의존하지 않으므로 PC의 JVM에서 그대로 시험할 수 있다.
@@ -36,6 +37,8 @@ public final class TripTracker {
         public long minTripMs = 20 * 1000L;
         /** 첫 위치에서 이만큼 멀어지면 집을 떠난 것으로 본다(m). */
         public float leftHomeM = 60f;
+        /** 연속 판정에 쓰는 위치 사이가 이보다 벌어지면 연속 판정을 처음부터 다시 한다(B04). */
+        public long maxFixGapMs = 15 * 1000L;
     }
 
     private final Config cfg;
@@ -50,6 +53,7 @@ public final class TripTracker {
     private long lastUsableFixMs;
     private long lastFixMs;
     private int fixCount;
+    private long lastRunFixMs;   // 연속 판정에 마지막으로 쓴 위치의 시각 (B04)
 
     private boolean haveFirst;
     private double firstLat;
@@ -101,13 +105,18 @@ public final class TripTracker {
         lastFixMs = 0;
         fixCount = 0;
         haveFirst = false;
+        lastRunFixMs = 0;
         resetRuns();
     }
 
-    /** 재시작 후 이어서 측정할 때: 이미 집을 떠났는지 여부를 복원한다. */
-    public void restoreLeftHome(boolean v) {
-        leftHome = v;
-        wifiLost = v;
+    /** 재시작 후 이어서 측정할 때: 저장해 둔 두 상태를 따로 복원한다. GPS로 집을 벗어난 것과 Wi-Fi가 끊긴 것은 다르다 (B06). */
+    public void restoreState(boolean leftHomeV, boolean wifiLostV) {
+        leftHome = leftHomeV;
+        wifiLost = wifiLostV;
+    }
+
+    public boolean hasLostWifi() {
+        return wifiLost;
     }
 
     private void resetRuns() {
@@ -120,6 +129,7 @@ public final class TripTracker {
     /** 집 Wi-Fi가 끊어짐 = 집을 떠났다는 신호. */
     public void onWifiLost() {
         if (rec != null) {
+            if (!leftHome) resetRuns();   // 집을 떠나기 전의 연속 판정은 버린다 (B08)
             leftHome = true;
             wifiLost = true;
         }
@@ -145,7 +155,22 @@ public final class TripTracker {
         } else if (!leftHome && accM <= cfg.goodAccM
                 && Geo.distanceM(firstLat, firstLon, lat, lon) > cfg.leftHomeM) {
             leftHome = true;
+            resetRuns();                  // 집을 떠나기 전의 연속 판정은 버린다 (B08)
         }
+
+        // 집을 떠난 근거(Wi-Fi 끊김 또는 첫 위치에서 60m 넘게 이동)가 없으면 자동 도착을 판정하지 않는다 (B08)
+        if (!leftHome) {
+            resetRuns();
+            return;
+        }
+        // 최소 이동 시간 전의 위치로는 연속 판정을 시작하지 않는다 (B09)
+        if (fixElapsedMs - t0 < cfg.minTripMs) {
+            resetRuns();
+            return;
+        }
+        // 연속 판정에 쓴 위치 사이가 너무 벌어졌으면 이전 연속 판정을 버린다 (B04)
+        if (lastRunFixMs != 0 && fixElapsedMs - lastRunFixMs > cfg.maxFixGapMs) resetRuns();
+        lastRunFixMs = fixElapsedMs;
 
         // 가장 가까운 정류장 찾기
         Geo.Stop best = null;
@@ -213,6 +238,7 @@ public final class TripTracker {
             finish(Proto.ST_CANCELED, 0, 0, 0, "집을 떠나지 않음");
             return;
         }
+        if (lastRunFixMs != 0 && nowElapsedMs - lastRunFixMs > cfg.maxFixGapMs) resetRuns();   // B04
         if (!needManualSent && el >= 30000L && nowElapsedMs - lastUsableFixMs >= cfg.needManualMs) {
             needManualSent = true;
             listener.onNeedManual(rec);
@@ -224,19 +250,38 @@ public final class TripTracker {
         if (rec != null && wifiLost) finish(Proto.ST_CANCELED, 0, 0, 0, "도착 전 귀가");
     }
 
-    /** 사용자가 알림에서 "도착"을 누름. stopId가 0이면 예상 정류장, 그것도 없으면 첫 정류장을 쓴다. */
-    public void manualArrive(long nowElapsedMs, int stopId) {
-        if (rec == null) return;
-        int sid = stopId;
-        if (sid <= 0) sid = rec.stopHint;
-        if (sid <= 0 && nearStop > 0) sid = nearStop;
-        if (sid <= 0 && !stops.isEmpty()) sid = stops.get(0).id;
-        if (sid <= 0) sid = 1;
+    /** 수동 확인에 쓸 수 있는 설정된 정류장. 빈 슬롯은 제외한다. */
+    public List<Geo.Stop> manualStops() {
+        List<Geo.Stop> out = new ArrayList<Geo.Stop>();
+        for (Geo.Stop s : stops) {
+            if (s.has || !s.name.trim().isEmpty()) out.add(s);
+        }
+        return out;
+    }
+
+    private boolean knownStop(int id) {
+        for (Geo.Stop s : manualStops()) if (s.id == id) return true;
+        return false;
+    }
+
+    /** 목적지가 불명확하면 false를 반환해 선택을 요청한다. 임의로 1번에 저장하지 않는다. */
+    public boolean manualArrive(long nowElapsedMs, int stopId) {
+        if (rec == null) return false;
         if (nowElapsedMs - t0 < cfg.minTripMs) {
             finish(Proto.ST_CANCELED, 0, 0, 0, "너무 짧음");
-            return;
+            return true;
+        }
+        int sid = stopId;
+        if (sid > 0 && !knownStop(sid)) return false;
+        if (sid <= 0 && knownStop(rec.stopHint)) sid = rec.stopHint;
+        if (sid <= 0 && knownStop(nearStop)) sid = nearStop;
+        if (sid <= 0) {
+            List<Geo.Stop> choices = manualStops();
+            if (choices.size() != 1) return false;
+            sid = choices.get(0).id;
         }
         finishArrived(sid, nowElapsedMs, 2);
+        return true;
     }
 
     public void cancel(String why) {

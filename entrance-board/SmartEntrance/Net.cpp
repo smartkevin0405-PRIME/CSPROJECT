@@ -5,6 +5,7 @@
 #include "Net.h"
 #include "Devices.h"
 #include "secrets.h"
+#include "JsonStr.h"
 
 static bool busy = false;
 bool netBusy() { return busy; }
@@ -116,7 +117,9 @@ static int readCh(WiFiClient& c) {
 // HTTP/1.0으로 요청해서 본문이 조각(chunked)으로 나뉘어 오지 않게 한다
 static bool httpOpen(WiFiClient& c, const char* host, const char* path) {
   reqStart = millis();                   // 여기서부터 HTTP_TIMEOUT_MS 안에 끝나야 한다
+  c.setConnectionTimeout((int)HTTP_CONNECT_TIMEOUT_MS);   // 연결 단계도 제한한다 (B12)
   if (!c.connect(host, 80)) return false;
+  if (millis() - reqStart > HTTP_TIMEOUT_MS) { c.stop(); return false; }
   c.print(F("GET "));
   c.print(path);
   c.print(F(" HTTP/1.0\r\nHost: "));
@@ -180,17 +183,41 @@ private:
     do { ch = readCh(c); } while (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t');
     return ch;
   }
-  // 여는 따옴표 다음부터 닫는 따옴표까지 읽는다
+  // 여는 따옴표 다음부터 닫는 따옴표까지 읽는다. \uXXXX는 UTF-8로 바꾼다 (B14)
+  // 바이트를 쌓는 일은 JsonStrOut이 한다: 버퍼가 차면 그 뒤로는 아무것도 넣지 않고, 서로게이트 쌍을 합친다 (C06)
   bool readString(char* out, uint8_t len) {
-    uint8_t n = 0;
+    JsonStrOut js;
+    js.begin(out, len);
     for (;;) {
       int ch = readCh(c);
       if (ch < 0) return false;
       if (ch == '"') break;
-      if (ch == '\\') { ch = readCh(c); if (ch < 0) return false; }
-      if (n < len - 1) out[n++] = (char)ch;
+      if (ch == '\\') {
+        ch = readCh(c);
+        if (ch < 0) return false;
+        if (ch == 'u') {
+          uint16_t cp = 0;
+          for (uint8_t i = 0; i < 4; i++) {
+            int h = readCh(c);
+            if (h < 0) return false;
+            cp = (uint16_t)(cp << 4);
+            if (h >= '0' && h <= '9') cp |= (uint16_t)(h - '0');
+            else if (h >= 'a' && h <= 'f') cp |= (uint16_t)(h - 'a' + 10);
+            else if (h >= 'A' && h <= 'F') cp |= (uint16_t)(h - 'A' + 10);
+            else return false;
+          }
+          js.putCode(cp);
+          continue;
+        }
+        if (ch == 'n') ch = '\n';
+        else if (ch == 't') ch = '\t';
+        else if (ch == 'r') ch = '\r';
+        else if (ch == 'b') ch = '\b';
+        else if (ch == 'f') ch = '\f';
+      }
+      js.putChar((uint8_t)ch);
     }
-    out[n] = 0;
+    js.finish();
     return true;
   }
 };
@@ -278,6 +305,7 @@ bool fetchWeather(WeatherInfo& out) {
   WiFiClient client;
   bool gotTemp = false, gotSky = false, rain = false, snow = false;
   uint8_t nPty = 0, nSky = 0, nT1h = 0, maxSky = 0, firstPty = 0, nowPty = 255;
+  bool resultOk = false;                                  // 응답 머리말의 resultCode가 "00"인지 (B13)
   if (httpOpen(client, "apis.data.go.kr", reqPath)) {
     JsonScan scan(client);
     char* key = fieldName;
@@ -289,6 +317,7 @@ bool fetchWeather(WeatherInfo& out) {
       if (r == SCAN_PAIR) {
         if (strcmp(key, "category") == 0) { strncpy(cat, val, 3); cat[3] = 0; }
         else if (strcmp(key, "fcstValue") == 0) { strncpy(fval, val, 7); fval[7] = 0; }
+        else if (strcmp(key, "resultCode") == 0) resultOk = (strcmp(val, "00") == 0);   // B13
         continue;
       }
       // 예보 한 건이 끝났다. 같은 항목은 가까운 시각부터 차례로 온다
@@ -314,7 +343,7 @@ bool fetchWeather(WeatherInfo& out) {
   client.stop();
   busy = false;
 
-  if (!gotTemp || !gotSky) return false;
+  if (!resultOk || !gotTemp || !gotSky || nPty == 0) return false;   // 강수 정보 없는 응답은 실패 (B13)
   out.sky = maxSky;
   out.pty = firstPty;
   out.nowPty = nowPty;

@@ -74,11 +74,12 @@ public final class TripDb extends SQLiteOpenHelper {
         r.tempC = c.getInt(12);
         r.note = c.getString(13);
         r.synced = c.getInt(14) != 0;
+        r.createdMs = c.getLong(15);
         return r;
     }
 
     private static final String COLS = "trip,user,stop_hint,stop,wx,tb,status,dur_ms,q,src,epoch,"
-            + "eta_s,temp_c,note,synced";
+            + "eta_s,temp_c,note,synced,created_ms";
 
     public synchronized boolean exists(long trip) {
         Cursor c = getReadableDatabase().rawQuery("SELECT 1 FROM trips WHERE trip=?",
@@ -113,6 +114,13 @@ public final class TripDb extends SQLiteOpenHelper {
                 new String[] {String.valueOf(r.trip)});
     }
 
+    /** 이미 현관판에 저장된 옛 기록의 이동 ID를 음수로 바꿔 같은 ID를 새로 쓸 수 있게 한다 (N4). */
+    public synchronized boolean retire(long trip) {
+        getWritableDatabase().execSQL("UPDATE trips SET trip = -created_ms WHERE trip = ? AND synced = 1",
+                new Object[] {trip});
+        return !exists(trip);
+    }
+
     public synchronized void markSynced(long trip) {
         ContentValues v = new ContentValues();
         v.put("synced", 1);
@@ -134,14 +142,22 @@ public final class TripDb extends SQLiteOpenHelper {
     private static final String FINISHED = "status NOT IN ('" + Proto.ST_ACTIVE + "','"
             + Proto.ST_WAIT_USER + "')";
 
-    /** 끝났지만 아직 현관판에 저장되지 않은 기록(이동 ID 오름차순). */
-    public synchronized List<TripRecord> unsynced() {
-        return query("synced=0 AND " + FINISHED, "trip ASC", 50);
+    /** 지정한 사용자의 끝났지만 아직 현관판에 저장되지 않은 기록(이동 ID 오름차순). (B02) */
+    public synchronized List<TripRecord> unsynced(int user) {
+        return query("synced=0 AND user=" + user + " AND " + FINISHED, "trip ASC", 50);
     }
 
-    public synchronized int countUnsynced() {
-        Cursor c = getReadableDatabase().rawQuery(
-                "SELECT COUNT(*) FROM trips WHERE synced=0 AND " + FINISHED, null);
+    public synchronized int countUnsynced(int user) {
+        return countWhere("synced=0 AND user=" + user + " AND " + FINISHED);
+    }
+
+    /** 지금 설정과 다른 사용자 번호로 남은 미전송 기록 수 (B02) */
+    public synchronized int countUnsyncedOtherUsers(int user) {
+        return countWhere("synced=0 AND user<>" + user + " AND " + FINISHED);
+    }
+
+    private int countWhere(String where) {
+        Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM trips WHERE " + where, null);
         try {
             return c.moveToFirst() ? c.getInt(0) : 0;
         } finally {

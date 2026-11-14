@@ -1,6 +1,8 @@
 // 생성형 AI(Claude)의 도움을 받아 작성함.
 // 앱의 core 패키지(Android API를 쓰지 않는 부분)를 PC의 JVM에서 시험한다.
 // 실행: android/coretest/run.sh
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,6 +16,7 @@ import kr.doorboard.travellearn.core.PhoneServerLogic;
 import kr.doorboard.travellearn.core.Proto;
 import kr.doorboard.travellearn.core.TripRecord;
 import kr.doorboard.travellearn.core.TripTracker;
+import kr.doorboard.travellearn.core.SyncRetry;
 
 public class CoreSelfTest {
     static int pass;
@@ -99,6 +102,34 @@ public class CoreSelfTest {
         }
         if (sink.done == null) return Long.MIN_VALUE;
         return sink.done.durMs - trueEnter;
+    }
+
+    // ---- 2차 수정 회귀 시험 도우미 ----
+    static final class Cap implements TripTracker.Listener {
+        TripRecord done;
+        int manual;
+        public void onFinished(TripRecord r) { done = r; }
+        public void onNeedManual(TripRecord r) { manual++; }
+    }
+
+    static TripTracker trackerAt(Cap cap, double stopLat, double stopLon) {
+        Geo.Stop s = new Geo.Stop();
+        s.id = 1; s.name = "S1"; s.has = true; s.lat = stopLat; s.lon = stopLon; s.radiusM = 30f;
+        List<Geo.Stop> stops = new ArrayList<Geo.Stop>();
+        stops.add(s);
+        TripTracker t = new TripTracker(new TripTracker.Config(), stops, cap);
+        TripRecord r = new TripRecord();
+        r.trip = 1; r.user = 1;
+        t.start(r, 0L);
+        return t;
+    }
+
+    static HttpMini.Response postSigned(PhoneServerLogic lg, byte[] k, String path, String body) {
+        HttpMini.Request q = new HttpMini.Request();
+        q.method = "POST"; q.path = path; q.body = body;
+        q.headers.put("x-tl-user", "1");
+        q.headers.put("x-tl-mac", Proto.mac(k, "POST", path, body));
+        return lg.handle(q, 0L);
     }
 
     public static void main(String[] args) throws Exception {
@@ -282,6 +313,38 @@ public class CoreSelfTest {
             check("(i) 20초 미만 수동 도착은 취소 처리", s.done != null && Proto.ST_CANCELED.equals(s.done.status));
         }
 
+        // 수동 도착: 빈 슬롯을 건너뛰고, 목적지가 여러 곳이면 선택 전에는 저장하지 않는다.
+        {
+            List<Geo.Stop> l = stops(Double.NaN, Double.NaN, 30, Double.NaN, Double.NaN, 30);
+            l.get(1).name = "실제 지하철역";
+            Sink s = new Sink();
+            TripTracker t = new TripTracker(new TripTracker.Config(), l, s);
+            t.start(rec(1), t0);
+            check("수동 도착: 2번만 설정되어 있으면 2번에 저장", t.manualArrive(t0 + 300000, 0)
+                    && s.done != null && s.done.stop == 2);
+            l.get(0).name = "버스 정류장";
+            s = new Sink(); t = new TripTracker(new TripTracker.Config(), l, s); t.start(rec(2), t0);
+            check("수동 도착: 여러 정류장 중 임의 선택 금지", !t.manualArrive(t0 + 300000, 0)
+                    && t.isActive() && s.done == null);
+            check("수동 도착: 없는 정류장 거부", !t.manualArrive(t0 + 300000, 4) && t.isActive());
+            check("수동 도착: 명시적으로 고른 2번에 저장", t.manualArrive(t0 + 300000, 2)
+                    && s.done.stop == 2 && s.done.q == 2);
+            l.get(0).name = ""; l.get(1).name = "";
+            s = new Sink(); t = new TripTracker(new TripTracker.Config(), l, s); t.start(rec(3), t0);
+            check("수동 도착: 설정된 목적지가 없으면 저장 안 함", !t.manualArrive(t0 + 300000, 0)
+                    && t.isActive());
+        }
+        {
+            SyncRetry retry = new SyncRetry();
+            check("등록 재시도: 기록 유무와 무관하게 5·15·60초", retry.nextDelayMs() == 5000
+                    && retry.nextDelayMs() == 15000 && retry.nextDelayMs() == 60000);
+            boolean capped = true;
+            for (int i = 0; i < 20; i++) capped &= retry.nextDelayMs() == 300000;
+            check("등록 재시도: 5분 간격으로 계속 유지", capped);
+            retry.reset();
+            check("연결 성공·새 Wi-Fi 연결 후 처음 간격으로 복귀", retry.nextDelayMs() == 5000);
+        }
+
         // ------------------------------------------------------------ 4. 폰 서버 요청 검증
         final List<PhoneServerLogic.Depart> got = new ArrayList<PhoneServerLogic.Depart>();
         final long[] canceled = new long[1];
@@ -336,6 +399,95 @@ public class CoreSelfTest {
         ping.method = "GET";
         ping.path = "/v1/ping";
         check("ping은 인증 없이 응답", logic.handle(ping, 0).body.equals("{\"ok\":1,\"dev\":\"phone\",\"v\":1,\"user\":1,\"busy\":0}"));
+
+        // ---- 2차 수정: B04, B08, B09, B06 ----
+        double H = 37.5, L = 127.0;
+        double S = H + 500 / 111320.0;            // 집에서 북쪽 500m
+        double S2 = H + 20 / 111320.0;            // 집에서 북쪽 20m
+
+        Cap c1 = new Cap();
+        TripTracker t1 = trackerAt(c1, S, L);
+        t1.onFix(H, L, 10f, 1000);
+        t1.onWifiLost();
+        t1.onFix(S, L, 10f, 30000);
+        t1.onFix(S, L, 10f, 600000);              // 570초 공백 뒤
+        check("B04 긴 공백 뒤 표본은 연속으로 보지 않음", c1.done == null && t1.isActive());
+        t1.onFix(S, L, 10f, 602000);
+        check("B04 공백 뒤 새로 2회 연속이면 도착, 시간은 600초", c1.done != null && c1.done.durMs == 600000L);
+
+        Cap c2 = new Cap();
+        TripTracker t2 = trackerAt(c2, S2, L);
+        t2.onFix(H, L, 10f, 25000);
+        t2.onFix(H, L, 10f, 27000);
+        check("B08 집을 떠난 근거 없이 제자리면 도착 아님", c2.done == null && t2.isActive());
+        t2.onWifiLost();
+        t2.onFix(H, L, 10f, 41000);
+        t2.onFix(H, L, 10f, 43000);
+        check("B08 Wi-Fi가 끊긴 뒤에는 도착 판정", c2.done != null && c2.done.durMs == 41000L);
+
+        Cap c3 = new Cap();
+        TripTracker t3 = trackerAt(c3, S, L);
+        t3.onWifiLost();
+        for (long ms = 10000; ms <= 30000; ms += 2000) t3.onFix(S, L, 10f, ms);
+        check("B09 20초 전 진입은 버리고 20초부터 다시 세어 도착", c3.done != null && c3.done.durMs == 20000L);
+
+        Cap c4 = new Cap();
+        TripTracker t4 = trackerAt(c4, S, L);
+        t4.restoreState(true, false);
+        t4.onHomeReturned();
+        check("B06 Wi-Fi가 끊긴 적 없으면 귀가 취소 안 함", c4.done == null && t4.isActive());
+        t4.restoreState(true, true);
+        t4.onHomeReturned();
+        check("B06 Wi-Fi가 끊겼다가 돌아오면 취소", c4.done != null && Proto.ST_CANCELED.equals(c4.done.status));
+
+        // ---- 2차 수정: B18 ----
+        final byte[] k18 = Proto.parseKey("000102030405060708090a0b0c0d0e0f");
+        final int[] departs18 = {0};
+        PhoneServerLogic lg18 = new PhoneServerLogic(new PhoneServerLogic.Callbacks() {
+            public int user() { return 1; }
+            public byte[] key() { return k18; }
+            public boolean busy() { return false; }
+            public String onDepart(PhoneServerLogic.Depart d, long rx) { departs18[0]++; return "tracking"; }
+            public String onCancel(long trip) { return "unknown"; }
+        });
+        check("B18 v=99 거절", postSigned(lg18, k18, "/v1/depart",
+                "{\"v\":99,\"trip\":5,\"user\":1,\"stop\":0,\"wx\":0,\"tb\":0,\"age_ms\":0}").status == 400);
+        check("B18 v 없음 거절", postSigned(lg18, k18, "/v1/depart",
+                "{\"trip\":6,\"user\":1,\"stop\":0,\"wx\":0,\"tb\":0,\"age_ms\":0}").status == 400);
+        check("B18 큰 정수 stop 거절", postSigned(lg18, k18, "/v1/depart",
+                "{\"v\":1,\"trip\":7,\"user\":1,\"stop\":4294967298,\"wx\":0,\"tb\":0,\"age_ms\":0}").status == 400);
+        check("B18 정상 요청은 통과", postSigned(lg18, k18, "/v1/depart",
+                "{\"v\":1,\"trip\":8,\"user\":1,\"stop\":0,\"wx\":0,\"tb\":0,\"age_ms\":0}").status == 200
+                && departs18[0] == 1);
+
+        // ---- 2차 수정: B16 ----
+        InputStream slowCr = new InputStream() {
+            public int read() throws IOException {
+                try { Thread.sleep(100); } catch (InterruptedException e) { throw new IOException("중단"); }
+                return '\r';
+            }
+        };
+        long t16 = System.nanoTime();
+        boolean timedOut16 = false;
+        try {
+            HttpMini.readRequest(slowCr, Proto.MAX_BODY, System.nanoTime() + 500L * 1000000L);
+        } catch (IOException e) {
+            timedOut16 = true;
+        }
+        long took16 = (System.nanoTime() - t16) / 1000000L;
+        check("B16 느린 CR 입력은 마감 시각에 끊김", timedOut16 && took16 < 1500);
+        InputStream manyCr = new InputStream() {
+            public int read() { return '\r'; }
+        };
+        boolean big16 = false;
+        try {
+            HttpMini.readRequest(manyCr, Proto.MAX_BODY, 0L);
+        } catch (HttpMini.HttpError e) {
+            big16 = true;
+        } catch (IOException e) {
+            big16 = false;
+        }
+        check("B16 CR만 끝없이 와도 헤더 바이트 상한에서 끊김", big16);
 
         System.out.println("----------------------------------------");
         System.out.println("통과 " + pass + " / 실패 " + fail);
