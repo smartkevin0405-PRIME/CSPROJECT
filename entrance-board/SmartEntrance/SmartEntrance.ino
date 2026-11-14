@@ -186,16 +186,16 @@ static bool handleCard() {
   uint8_t uid[7], len = 0;
   if (!readCard(uid, len)) return false;
   int idx = findUser(uid, len);              // 배열 순차 탐색
-  if (idx >= 0 && idx == lastTagUser && millis() - lastTagMs < RETAG_IGNORE_MS) {
-    Serial.println(F("[main] same card again, ignored"));   // C03
-    return true;
-  }
   if (idx >= 0 && idx == departedUser && millis() - departedAt <= CANCEL_WINDOW_MS) {
     travelOnCancel((uint8_t)idx);            // 나갔다가 곧바로 다시 태그 → 앞 외출 취소
     departedUser = -1;
     Serial.println(F("[main] trip canceled by re-tag"));
     startUser(idx, false);                   // 취소한 뒤 정보를 다시 보여 주고 새 출발을 감시한다 (N3, C02)
     lastTagUser = idx; lastTagMs = millis(); // 조회가 끝난 시각에서 잰다 (C03)
+    return true;
+  }
+  if (idx >= 0 && idx == lastTagUser && millis() - lastTagMs < RETAG_IGNORE_MS) {
+    Serial.println(F("[main] same card again, ignored"));   // C03. 취소 판정 뒤에 둔다: 출발 직후의 재태그는 취소다
     return true;
   }
   if (idx < 0) showMessage("UNKNOWN CARD", "this card is not registered", C_RED, 2000, ST_PROMPT);

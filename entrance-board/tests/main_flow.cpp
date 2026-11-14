@@ -108,6 +108,14 @@ int main(){
  clockMs+=4000;
  memcpy(shimCardUid, USERS[0].uid, USERS[0].uidLen); shimCardLen=USERS[0].uidLen;
  loop(); assert(requests>r1);                     // 5초 뒤: 다시 조회
+ // C03 보완: 조회 직후 나갔다가 5초 안에 다시 찍으면 무시가 아니라 취소다
+ reset();
+ memcpy(shimCardUid, USERS[0].uid, USERS[0].uidLen); shimCardLen=USERS[0].uidLen;
+ loop(); assert(state==ST_SHOW);
+ clockMs+=1000; openedAt=clockMs; openedFlag=true; clockMs+=50; loop(); assert(departures==1);
+ clockMs+=2000;
+ memcpy(shimCardUid, USERS[0].uid, USERS[0].uidLen); shimCardLen=USERS[0].uidLen;
+ loop(); assert(cancels==1);
  // C05: 사람이 계속 감지돼 갱신이 미뤄져도 30분 넘은 날씨는 버린다
  reset(); weatherOkAt=clockMs; clockMs+=WEATHER_KEEP_MS+1; pirNow=true; loop();
  assert(!weather.ok && requests==0);   // 갱신은 미루되(N6) 오래된 값은 버린다
