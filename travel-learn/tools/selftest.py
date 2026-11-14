@@ -257,6 +257,10 @@ def main():
         r = post_trip(A, 2, K2, st="lost", stop=0, dur_ms=0, trip=first)[1]
         # 2차 수정(B15): 최근 8개 목록에서 밀려나도 처리한 최고값 이하 ID는 dup이다
         check("(l) 목록(8개)에서 밀려난 옛 기록도 최고값 이하라 dup (B15)", (r.data or {}).get("why") == "dup", r.short())
+        # 다른 계보(더 큰 부팅 번호)의 현관판 ID가 최고값을 올리면 안 된다 (C01)
+        post_trip(A, 2, K2, st="lost", stop=0, dur_ms=0, trip=(((A.boot + 50) & 0x7FFF) << 16) | 1)
+        r = post_trip(A, 2, K2, st="lost", stop=0, dur_ms=0, trip=5)[1]
+        check("(l) 다른 계보(더 큰 부팅 번호) ID는 최고값을 올리지 않음 (C01)", (r.data or {}).get("why") == "status", r.short())
 
         # 기타: 404 / 413 / 400
         r = tl.http_call(LO, A.port, "GET", "/v1/nothing", K1, 1)

@@ -5,6 +5,7 @@
 #include "Net.h"
 #include "Devices.h"
 #include "secrets.h"
+#include "JsonStr.h"
 
 static bool busy = false;
 bool netBusy() { return busy; }
@@ -183,8 +184,10 @@ private:
     return ch;
   }
   // 여는 따옴표 다음부터 닫는 따옴표까지 읽는다. \uXXXX는 UTF-8로 바꾼다 (B14)
+  // 바이트를 쌓는 일은 JsonStrOut이 한다: 버퍼가 차면 그 뒤로는 아무것도 넣지 않고, 서로게이트 쌍을 합친다 (C06)
   bool readString(char* out, uint8_t len) {
-    uint8_t n = 0;
+    JsonStrOut js;
+    js.begin(out, len);
     for (;;) {
       int ch = readCh(c);
       if (ch < 0) return false;
@@ -203,16 +206,7 @@ private:
             else if (h >= 'A' && h <= 'F') cp |= (uint16_t)(h - 'A' + 10);
             else return false;
           }
-          uint8_t u8[3];
-          uint8_t k;
-          if (cp < 0x80) { u8[0] = (uint8_t)cp; k = 1; }
-          else if (cp < 0x800) { u8[0] = (uint8_t)(0xC0 | (cp >> 6)); u8[1] = (uint8_t)(0x80 | (cp & 0x3F)); k = 2; }
-          else if (cp >= 0xD800 && cp <= 0xDFFF) { u8[0] = '?'; k = 1; }          // 서로게이트 쌍은 쓰지 않는다
-          else { u8[0] = (uint8_t)(0xE0 | (cp >> 12)); u8[1] = (uint8_t)(0x80 | ((cp >> 6) & 0x3F));
-                 u8[2] = (uint8_t)(0x80 | (cp & 0x3F)); k = 3; }
-          if (n + k <= len - 1) {                                                 // 글자가 잘리지 않게 통째로만 넣는다
-            for (uint8_t i = 0; i < k; i++) out[n++] = (char)u8[i];
-          }
+          js.putCode(cp);
           continue;
         }
         if (ch == 'n') ch = '\n';
@@ -221,9 +215,9 @@ private:
         else if (ch == 'b') ch = '\b';
         else if (ch == 'f') ch = '\f';
       }
-      if (n < len - 1) out[n++] = (char)ch;
+      js.putChar((uint8_t)ch);
     }
-    out[n] = 0;
+    js.finish();
     return true;
   }
 };

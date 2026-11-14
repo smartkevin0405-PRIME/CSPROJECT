@@ -46,6 +46,10 @@ static bool     armedDoorOpen = false;   // 문이 열린 채로 태그했는지
 static int      departedUser = -1;
 static uint32_t departedAt = 0;
 
+// 같은 카드를 연달아 찍는 것을 걸러내기 위한 마지막 태그 (C03)
+static int      lastTagUser = -1;
+static uint32_t lastTagMs = 0;
+
 static bool processDeparture();
 
 // ---- 이동 모듈이 부르는 함수 ----
@@ -86,6 +90,15 @@ static void refreshWeather() {
     weather.ok = false;                      // 오래 실패했으면 이전 값도 버린다 (N5)
     matrixShowNone();
   }                                          // 그 밖에는 마지막 정상 값을 그대로 둔다 (N5)
+}
+
+// 마지막 정상 날씨가 너무 오래됐으면 조회와 무관하게 버린다 (C05)
+static void expireWeather() {
+  if (weather.ok && millis() - weatherOkAt > WEATHER_KEEP_MS) {
+    weather.ok = false;
+    matrixShowNone();
+    Serial.println(F("[main] weather expired"));
+  }
 }
 
 // 카드가 새로 닿았으면 UID를 읽는다
@@ -130,7 +143,7 @@ static bool betweenFetches() {
 
 // 등록된 사용자가 태그했을 때: 조회하고 표시한다
 // 조회 중 문이 열리면 현재 요청까지만 마치고 출발을 전달한다
-static void handleUser(int idx) {
+static void startUser(int idx, bool openDoorCounts) {
   const User& u = USERS[idx];
   if (armedUser >= 0 && armedUser != idx) {  // 마지막으로 태그한 사람이 출발 대상이다 (B01)
     Serial.println(F("[main] armed user replaced"));
@@ -138,7 +151,7 @@ static void handleUser(int idx) {
   doorJustOpened();                          // 태그 전에 열린 문은 이번 출발이 아니다
   armedUser = idx;                           // API 실패와 무관하게 출발을 감시한다
   armedAt = millis();
-  armedDoorOpen = doorIsOpen();              // 문이 열린 채 태그했으면 닫힐 때를 출발로 본다 (N2)
+  armedDoorOpen = openDoorCounts && doorIsOpen();   // 취소 직후에는 열린 문을 출발로 보지 않는다 (C02)
   curUser = idx;
   memset(arrivalOk, 0, sizeof(arrivalOk));
   screenMessage("LOADING", u.name, C_CYAN);
@@ -166,6 +179,8 @@ static void handleUser(int idx) {
   enter(ST_SHOW);
 }
 
+static void handleUser(int idx) { startUser(idx, true); }
+
 // 카드가 닿았으면 처리하고 true, 카드가 없으면 false
 static bool handleCard() {
   uint8_t uid[7], len = 0;
@@ -175,11 +190,19 @@ static bool handleCard() {
     travelOnCancel((uint8_t)idx);            // 나갔다가 곧바로 다시 태그 → 앞 외출 취소
     departedUser = -1;
     Serial.println(F("[main] trip canceled by re-tag"));
-    handleUser(idx);                         // 취소한 뒤 정보를 다시 보여 주고 새 출발을 감시한다 (N3)
+    startUser(idx, false);                   // 취소한 뒤 정보를 다시 보여 주고 새 출발을 감시한다 (N3, C02)
+    lastTagUser = idx; lastTagMs = millis(); // 조회가 끝난 시각에서 잰다 (C03)
+    return true;
+  }
+  if (idx >= 0 && idx == lastTagUser && millis() - lastTagMs < RETAG_IGNORE_MS) {
+    Serial.println(F("[main] same card again, ignored"));   // C03. 취소 판정 뒤에 둔다: 출발 직후의 재태그는 취소다
     return true;
   }
   if (idx < 0) showMessage("UNKNOWN CARD", "this card is not registered", C_RED, 2000, ST_PROMPT);
-  else handleUser(idx);
+  else {
+    handleUser(idx);
+    lastTagUser = idx; lastTagMs = millis(); // 조회가 끝난 시각에서 잰다 (C03)
+  }
   return true;
 }
 
@@ -223,11 +246,11 @@ static bool processDeparture() {
     openedAt = millis();
   }
   uint32_t at = opened ? openedAt : (uint32_t)millis();
-  if ((int32_t)(at - armedAt) < 0) at = armedAt;     // 태그 직전에 열린 문은 태그 순간으로 본다 (N2)
+  if ((int32_t)(at - armedAt) < 0) at = armedAt;     // 문 열림 시각이 태그 순간보다 조금 앞서도(디바운스) 부호 없는 뺄셈이 넘치지 않게 태그 순간으로 맞춘다 (C04)
   if (at - armedAt > DEPART_WINDOW_MS) { armedUser = -1; armedDoorOpen = false; return false; }
   if (!opened) return false;
   armedDoorOpen = false;
-  sendDeparture(openedAt);
+  sendDeparture(at);                                 // 창 판정에 쓴 시각과 보내는 시각을 같게 한다 (C04)
   showMessage("HAVE A NICE DAY", "", C_GREEN, 3000, ST_IDLE);
   return true;
 }
@@ -251,6 +274,7 @@ void loop() {
   devicesLoop();
   netLoop();                                   // WiFi가 끊겼으면 다시 연결
   travelLoop();
+  expireWeather();                             // 오래된 날씨는 조회와 무관하게 버린다 (C05)
   if (processDeparture()) return;
   uint32_t now = millis();
 

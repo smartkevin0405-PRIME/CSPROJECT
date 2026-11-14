@@ -133,25 +133,31 @@ bool TlStore::setPhone(uint8_t user, const uint8_t ip[4], uint16_t port) {
   return true;
 }
 
-bool TlStore::seenTrip(uint8_t user, uint32_t trip) const {
+bool TlStore::seenTrip(uint8_t user, uint32_t trip, uint32_t boardLimit) const {
   if (user < 1 || user > TL_MAX_USERS || trip == 0) return false;
   const uint8_t* p = _img.b + TL_OFF_DEDUP + (size_t)(user - 1) * TL_DEDUP_REC;
   for (uint8_t i = 0; i < TL_DEDUP_RING; i++) {
     if (rd32(p + 4 * i) == trip) return true;
   }
   // 폰은 기록을 이동 ID 오름차순으로 보낸다. 이미 처리한 가장 큰 ID 이하는 재전송으로 본다. (B15)
-  uint32_t hw = rd32(p + TL_DEDUP_HW_OFF + ((trip & 0x80000000UL) ? 4 : 0));
+  bool phoneId = (trip & 0x80000000UL) != 0;
+  if (!phoneId && trip > boardLimit) return false;              // 다른 계보의 ID: 최고값으로 판정하지 않는다 (C01)
+  uint32_t hw = rd32(p + TL_DEDUP_HW_OFF + (phoneId ? 4 : 0));
+  if (!phoneId && hw > boardLimit) return false;                // 최고값 자체가 다른 계보에서 왔으면 쓰지 않는다 (C01)
   return hw != 0 && trip <= hw;
 }
 
-void TlStore::addTrip(uint8_t user, uint32_t trip) {
+void TlStore::addTrip(uint8_t user, uint32_t trip, uint32_t boardLimit) {
   if (user < 1 || user > TL_MAX_USERS || trip == 0) return;
   uint8_t* p = _img.b + TL_OFF_DEDUP + (size_t)(user - 1) * TL_DEDUP_REC;
   uint8_t pos = (uint8_t)(p[TL_DEDUP_RING * 4] % TL_DEDUP_RING);
   wr32(p + 4 * pos, trip);
   p[TL_DEDUP_RING * 4] = (uint8_t)((pos + 1) % TL_DEDUP_RING);   // 가장 오래된 것부터 덮어쓴다
-  uint8_t* h = p + TL_DEDUP_HW_OFF + ((trip & 0x80000000UL) ? 4 : 0);
-  if (trip > rd32(h)) wr32(h, trip);                              // 최고값 갱신 (B15)
+  bool phoneId = (trip & 0x80000000UL) != 0;
+  if (!phoneId && trip > boardLimit) return;                    // 다른 계보의 ID는 최고값을 올리지 않는다 (C01)
+  uint8_t* h = p + TL_DEDUP_HW_OFF + (phoneId ? 4 : 0);
+  uint32_t cur = rd32(h);
+  if ((!phoneId && cur > boardLimit) || trip > cur) wr32(h, trip);   // 다른 계보에서 온 최고값은 덮어쓴다 (C01)
 }
 
 bool TlStore::commit() {

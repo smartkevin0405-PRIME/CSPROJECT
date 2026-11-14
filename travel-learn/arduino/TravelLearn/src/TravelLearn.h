@@ -81,6 +81,7 @@ class TravelLearn {
   WiFiServer _server;
   bool _begun = false;
   uint16_t _seq = 0;                       // 부팅 후 이동 순번
+  uint32_t boardLimit() const;             // 이 현관판이 지금까지 발급한 가장 큰 이동 ID (C01)
   uint8_t _rr = 0;                         // 사용자 순환 처리 위치
   uint8_t _keys[TL_MAX_USERS][16] = {};
   bool _hasKey[TL_MAX_USERS] = {};
