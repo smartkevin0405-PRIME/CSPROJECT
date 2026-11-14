@@ -64,9 +64,9 @@ int main(){
  clockMs+=3000; drawRows(); assert(shown[0]==109 && shown[1]==117);
  assert(etaNow(TRAVEL_UNKNOWN_SEC, 0)==TRAVEL_UNKNOWN_SEC);
  reset(); openedFlag=true; openedAt=500; handleUser(0); assert(departures==0);
- reset(); armedUser=0; armedAt=1000; openedAt=121000; clockMs=130000; openedFlag=true;
- assert(processDeparture() && captured.uptimeMs==121000); // 처리 지연이 출발 허용 창을 바꾸지 않는다
- reset(); armedUser=0; armedAt=1000; openedAt=121001; clockMs=130000; openedFlag=true;
+ reset(); armedUser=0; armedAt=1000; openedAt=1000+DEPART_WINDOW_MS; clockMs=openedAt+9000; openedFlag=true;
+ assert(processDeparture() && captured.uptimeMs==1000+DEPART_WINDOW_MS); // 처리 지연이 출발 허용 창을 바꾸지 않는다
+ reset(); armedUser=0; armedAt=1000; openedAt=1001+DEPART_WINDOW_MS; clockMs=openedAt+9000; openedFlag=true;
  assert(!processDeparture() && departures==0);
  reset(); clockMs=UINT32_MAX-2000; weatherAt=clockMs; openOnFetch=1; handleUser(0);
  assert(departures==1 && captured.uptimeMs==UINT32_MAX-1000);

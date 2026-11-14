@@ -414,6 +414,19 @@ public class CoreSelfTest {
         check("B04 긴 공백 뒤 표본은 연속으로 보지 않음", c1.done == null && t1.isActive());
         t1.onFix(S, L, 10f, 602000);
         check("B04 공백 뒤 새로 2회 연속이면 도착, 시간은 600초", c1.done != null && c1.done.durMs == 600000L);
+        {
+            // 오차 100m 넘는 위치(다른 제공자)가 사이사이 끼어도 '근처에 머묾' 도착이 성립해야 한다
+            Cap cx = new Cap();
+            double sx = north(HOME_LAT, 500);
+            TripTracker tx = trackerAt(cx, sx, HOME_LON);
+            tx.onWifiLost();
+            for (long ms = 300000L; ms <= 360000L && cx.done == null; ms += 2000L) {
+                tx.onFix(sx, HOME_LON, 60f, ms);
+                if (ms % 4000L == 0) tx.onFix(sx, HOME_LON, 500f, ms + 1000L);
+            }
+            check("나쁜 위치가 섞여도 머묾 도착(q=1), 시간은 300초", cx.done != null && cx.done.q == 1
+                    && Proto.ST_ARRIVED.equals(cx.done.status) && cx.done.durMs == 300000L);
+        }
 
         Cap c2 = new Cap();
         TripTracker t2 = trackerAt(c2, S2, L);

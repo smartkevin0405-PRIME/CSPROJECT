@@ -142,10 +142,9 @@ public final class TripTracker {
         if (fixElapsedMs <= lastFixMs) return;    // 순서가 뒤바뀐 위치
         lastFixMs = fixElapsedMs;
         fixCount++;
-        if (accM <= 0 || accM > cfg.maxAccM) {
-            resetRuns();
-            return;
-        }
+        // 오차가 너무 큰 위치는 그냥 버린다. 연속 판정은 지우지 않는다: GPS와 네트워크 위치를 함께 받으므로
+        // 한쪽의 나쁜 위치 하나가 다른 쪽으로 쌓던 판정을 끊으면 안 된다. 오래 끊긴 경우는 maxFixGapMs가 막는다.
+        if (accM <= 0 || accM > cfg.maxAccM) return;
         lastUsableFixMs = fixElapsedMs;
 
         if (!haveFirst) {

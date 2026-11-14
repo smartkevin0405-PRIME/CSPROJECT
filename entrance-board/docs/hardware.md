@@ -55,7 +55,7 @@
 
 `SmartEntrance/travel_iface.h`(v0.2)가 약속이고, `SmartEntrance/travel_link.cpp`가 이를 이동 시간 모듈(TravelLearn) 호출로 바꾼다.
 
-- 등록된 카드를 태그한 뒤 120초 안에 문이 열리면 `travelOnDeparture()`로 출발 이벤트를 한 번 넘긴다. 출발 후 90초 안에 같은 사람이 다시 태그하면 `travelOnCancel()`
+- 등록된 카드를 태그한 뒤 10분 안에 문이 열리면 `travelOnDeparture()`로 출발 이벤트를 한 번 넘긴다. 출발 후 90초 안에 같은 사람이 다시 태그하면 `travelOnCancel()`
 - 번호: 모듈과 폰 앱의 사용자 번호는 `USERS` 배열 위치+1, 정류장 번호는 `STOPS` 배열 위치+1이다. `Stop.key`는 메인 코드 안에서만 쓰는 이름이고 모듈에 넘기지 않는다
 - 폰 앱의 정류장 n번은 `STOPS`의 n번째와 같은 정류장이어야 한다. 학습을 시작한 뒤 순서를 바꾸면 기록이 섞인다
 - 출발 신호의 정류장은 0(모름)으로 보낸다. 폰이 그 사용자의 정류장을 모두 감시한다

@@ -40,7 +40,7 @@
 |---|---|
 | `travelBegin()` (`setup()`, Wi-Fi 연결 뒤) | `setUserKey`, `setDefaultWalk`, `onDepartResult`, `onTripStored`, `begin` |
 | `travelLoop()` (`loop()`, 태그 후 API 조회 한 건이 끝날 때마다) | `loop` |
-| `travelOnDeparture(ev)` (태그 후 120초 안에 문 열림) | `notifyDeparture(user, 0, wx, tb, etaS, tempC)` |
+| `travelOnDeparture(ev)` (태그 후 10분 안에 문 열림) | `notifyDeparture(user, 0, wx, tb, etaS, tempC)` |
 | `travelOnCancel(userId)` (출발 후 90초 안에 다시 태그) | `cancelDeparture` |
 | `travelGetSlackSec(...)` (정보 화면 1초마다) | `slack` |
 | `travelPhoneOnline(userId)` (정보 화면의 `PHONE OK` / `PHONE --`) | `phoneOnline` |

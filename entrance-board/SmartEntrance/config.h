@@ -39,7 +39,7 @@ const uint8_t  DOOR_OPEN_LEVEL = HIGH;  // 문이 열렸을 때 D2 값. 반대�
 // ---------- 시간 (ms) ----------
 const uint32_t SHOW_MS          = 25000;   // 정보 표시 시간
 const uint32_t PROMPT_MS        = 20000;   // 태그 안내 유지 시간
-const uint32_t DEPART_WINDOW_MS = 120000;  // 태그 후 이 안에 문이 열리면 외출
+const uint32_t DEPART_WINDOW_MS = 600000;  // 태그 후 이 안(10분)에 문이 열리면 외출. 여유 시간을 보고 기다렸다 나가는 경우까지 잡는다
 const uint32_t IDLE_SENSOR_MS   = 5000;    // 실내 온습도 측정 간격
 const uint32_t WEATHER_MS       = 600000;  // 날씨 갱신 간격
 const uint32_t WEATHER_RETRY_MS = 30000;   // 날씨 조회 실패 뒤 다시 시도할 간격 (N5)
