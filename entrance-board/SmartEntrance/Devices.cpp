@@ -36,7 +36,7 @@ void devicesLoop() {
   }
 }
 
-bool pirActive() { return analogRead(PIN_PIR) > PIR_THRESHOLD; }
+bool pirActive() { return digitalRead(PIN_PIR) == PIR_ACTIVE_LEVEL; }
 bool doorIsOpen() { return doorOpen; }
 bool doorJustOpened() {
   bool f = doorOpenedFlag;

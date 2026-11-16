@@ -15,26 +15,31 @@
 #define USE_TRAVEL_STUB  1
 #endif
 
-// ---------- 핀 (설계 문서 2절과 같다) ----------
-const uint8_t PIN_DOOR     = 2;   // 문 열림 센서 MC-38
+// ---------- 핀 (entrance-board/docs/hardware.md와 같다) ----------
+// 분압: 보드 → 화면·RC522로 나가는 6개(D7, D8, D9, D10, D11, D13)는 1kΩ + 2kΩ로 약 3.3V
+// 74HCT125: RC522 MISO → D12, PIR OUT → D2 를 5V 신호로 바꾼다
+const uint8_t PIN_PIR      = 2;   // PIR 출력 (74HCT125 2번 채널을 거쳐 5V)
 const uint8_t PIN_SERVO    = 3;   // 날씨 다이얼 서보
 const uint8_t PIN_DHT      = 4;   // DHT11
-const uint8_t PIN_RFID_RST = 5;   // RC522 RST (분압)
-const uint8_t PIN_RFID_SS  = 6;   // RC522 SDA (분압)
-const uint8_t PIN_TFT_RST  = 7;   // TFT RESET (분압)
-const uint8_t PIN_TFT_DC   = 8;   // TFT DC/RS (분압)
-const uint8_t PIN_TFT_CS   = 10;  // TFT CS (분압)
-const uint8_t PIN_PIR      = A0;  // PIR 출력 (3.3V라서 아날로그로 읽는다)
-// SPI: D11 MOSI, D12 MISO, D13 SCK
+const uint8_t PIN_DOOR     = 5;   // 문 열림 센서 MC-38 (내부 풀업)
+const uint8_t PIN_TFT_RST  = 7;   // 화면 RESET (분압)
+const uint8_t PIN_TFT_DC   = 8;   // 화면 DC/RS (분압)
+const uint8_t PIN_TFT_CS   = 9;   // 화면 CS (분압)
+const uint8_t PIN_RFID_SS  = 10;  // RC522 SDA/SS (분압). 분압 전 신호가 74HCT125 1번 채널의 OE도 켠다
+// RC522 RST는 보드에 연결하지 않는다. 10kΩ으로 3.3V에 풀업하고 소프트웨어 리셋을 쓴다
+// SPI: D11 MOSI, D12 MISO(74HCT125를 거침), D13 SCK
 
 // ---------- 화면 ----------
-const uint32_t TFT_SPI_HZ   = 4000000;  // 저항 분압이라 낮게 시작. 안정적이면 올려 본다
+// 분압 상태에서 안정성을 먼저 보려고 500kHz로 시작한다. 이 속도에서는 화면 전체 칠하기가 약 7초 걸린다
+// (480 x 320 x 3바이트). 깨짐이 없으면 4MHz, 8MHz 순서로 올려 본다
+const uint32_t TFT_SPI_HZ   = 500000;
 const uint8_t  TFT_ROTATION = 1;        // 1 또는 3 (가로). 뒤집혀 보이면 바꾼다
-#define TFT_INVERT 1                    // 색이 반전돼 보이면 0으로
+#define TFT_INVERT 1                    // IPS 패널은 보통 1. 색이 반전돼 보이면 0으로
+// RC522는 MFRC522 라이브러리가 정한 4MHz로 통신한다 (라이브러리 설정이라 여기서 바꾸지 않는다)
 
 // ---------- 센서 ----------
-const int      PIR_THRESHOLD   = 300;   // analogRead 0~1023. 약 1.5V
-const uint8_t  DOOR_OPEN_LEVEL = HIGH;  // 문이 열렸을 때 D2 값. 반대로 동작하면 LOW로
+const uint8_t  PIR_ACTIVE_LEVEL = HIGH; // 사람을 감지했을 때 D2 값
+const uint8_t  DOOR_OPEN_LEVEL  = HIGH; // 문이 열렸을 때 D5 값. 반대로 동작하면 LOW로
 
 // ---------- 시간 (ms) ----------
 const uint32_t SHOW_MS          = 25000;   // 정보 표시 시간

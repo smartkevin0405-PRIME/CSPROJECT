@@ -4,7 +4,7 @@
 
 ## 준비
 1. Arduino IDE 보드 매니저에서 "Arduino UNO R4 Boards" 설치
-2. 라이브러리 매니저에서 설치: Adafruit GFX Library(함께 묻는 Adafruit BusIO 포함), MFRC522, Servo
+2. 라이브러리 매니저에서 설치: GFX Library for Arduino(Arduino_GFX, 1.6.9에서 확인), MFRC522, Servo
 2-1. 이동 시간 모듈: 저장소의 `travel-learn/arduino/TravelLearn` 폴더를 통째로 Arduino 라이브러리 폴더(보통 `문서/Arduino/libraries/`)에 복사한다. 데모 모드(`DEMO_MODE` 1)만 쓸 때나 config.h의 `USE_TRAVEL_STUB`이 1이면 필요 없다
 3. 이 폴더의 `secrets.h.example`을 같은 폴더에 `secrets.h`로 복사한다. 데모 모드에서도 이 파일이 있어야 컴파일된다. `secrets.h`는 `.gitignore`에 있어 git에 올라가지 않는다
 4. 이 폴더(SmartEntrance)를 통째로 열고 SmartEntrance.ino를 업로드
@@ -43,7 +43,7 @@ config.h의 `DEMO_MODE`가 1이면 WiFi와 API 키 없이 가짜 데이터로 �
 - config.h: 핀, 시간, User 클래스와 사용자·정류장 배열, 순차 탐색
 - secrets.h.example: WiFi·API 키·폰 공유 키의 예시. `secrets.h`로 복사해서 쓴다
 - Net.h/.cpp: WiFi, 날씨·버스·지하철 조회
-- Screens.h/.cpp, Tft9488.h/.cpp: 화면
+- Screens.h/.cpp: 화면 (Arduino_GFX, 바뀐 자리만 다시 그림)
 - Devices.h/.cpp: PIR, 문 센서, DHT11, LED 매트릭스, 서보
 - travel_iface.h: 이동 시간 모듈과의 약속
 - travel_link.cpp: TravelLearn 라이브러리 연결 (DEMO_MODE 0이고 USE_TRAVEL_STUB 0일 때)
