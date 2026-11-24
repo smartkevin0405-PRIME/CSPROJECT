@@ -68,13 +68,12 @@ static void goIdle() {
   enter(ST_IDLE);
 }
 
-// 날씨를 새로 받아 매트릭스와 다이얼에 반영한다
+// 날씨를 새로 받아 매트릭스에 반영한다 (화면의 NEXT 3H는 다음 그리기에서 반영)
 static void refreshWeather() {
   weatherTried = true;
   weatherAt = millis();
   if (fetchWeather(weather)) {
     matrixShowTemp(weather.tempC);
-    dialSet(weather.kind);
   } else {
     matrixShowNone();
   }
@@ -176,7 +175,7 @@ static void sendDeparture() {
   strncpy(ev.stopId, STOPS[u.stopIdx[0]].key, sizeof(ev.stopId) - 1);
   ev.outdoorTempC = weather.ok ? weather.tempC : -128;
   ev.sky = weather.ok ? weather.sky : 0;
-  ev.pty = weather.ok ? weather.nowPty : 255;    // 출발 시점 날씨 (다이얼의 '앞으로 3시간'이 아님)
+  ev.pty = weather.ok ? weather.nowPty : 255;    // 출발 시점 날씨 (화면 NEXT 3H의 '앞으로 3시간'이 아님)
   ev.arrivalCount = 0;
   if (armedUser == curUser) {
     for (uint8_t i = 0; i < u.stopCount && i < TRAVEL_MAX_ARRIVALS; i++) {

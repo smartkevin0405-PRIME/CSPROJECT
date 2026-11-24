@@ -4,14 +4,14 @@
 
 ## 준비
 1. Arduino IDE 보드 매니저에서 "Arduino UNO R4 Boards" 설치
-2. 라이브러리 매니저에서 설치: GFX Library for Arduino(Arduino_GFX, 1.6.9에서 확인), MFRC522, Servo
+2. 라이브러리 매니저에서 설치: GFX Library for Arduino(Arduino_GFX, 1.6.9에서 확인), MFRC522
 2-1. 이동 시간 모듈: 저장소의 `travel-learn/arduino/TravelLearn` 폴더를 통째로 Arduino 라이브러리 폴더(보통 `문서/Arduino/libraries/`)에 복사한다. 데모 모드(`DEMO_MODE` 1)만 쓸 때나 config.h의 `USE_TRAVEL_STUB`이 1이면 필요 없다
 3. 이 폴더의 `secrets.h.example`을 같은 폴더에 `secrets.h`로 복사한다. 데모 모드에서도 이 파일이 있어야 컴파일된다. `secrets.h`는 `.gitignore`에 있어 git에 올라가지 않는다
 4. 이 폴더(SmartEntrance)를 통째로 열고 SmartEntrance.ino를 업로드
 
 ## 처음에는 데모 모드
 config.h의 `DEMO_MODE`가 1이면 WiFi와 API 키 없이 가짜 데이터로 동작한다.
-화면, 매트릭스, 서보, RFID, PIR, 문 센서를 먼저 확인할 수 있다.
+화면, 매트릭스, RFID, PIR, 문 센서를 먼저 확인할 수 있다.
 
 ## 실제 조회로 바꾸기
 1. secrets.h(준비 3에서 복사한 파일)에 WiFi 이름·비밀번호, API 키, 사용자별 폰 공유 키를 적는다. 예시 파일(`secrets.h.example`)에는 실제 값을 쓰지 않는다
@@ -34,7 +34,7 @@ config.h의 `DEMO_MODE`가 1이면 WiFi와 API 키 없이 가짜 데이터로 �
 ## 동작 메모
 - 태그하면 날씨(1분 넘게 지났을 때)와 그 사람의 정류장 도착 정보를 차례로 받는다. 요청 1건은 연결부터 응답 끝까지 `HTTP_TIMEOUT_MS`(8초) 안에 끝난다
 - 조회 한 건이 끝날 때마다 문 센서(`devicesLoop`)와 이동 시간 모듈(`travelLoop`)을 돌린다. 응답을 기다리는 동안에도 문 센서는 계속 읽는다. 조회 중에 문이 열렸으면 조회가 끝난 뒤 외출로 처리한다
-- 다이얼과 화면의 `NEXT 3H`는 앞으로 3시간 중 처음 나온 강수형태, 이동 시간 학습에는 가장 가까운 예보 시각의 강수형태(`nowPty`)를 쓴다
+- 화면의 `NEXT 3H`는 앞으로 3시간 중 처음 나온 강수형태, 이동 시간 학습에는 가장 가까운 예보 시각의 강수형태(`nowPty`)를 쓴다
 - 정보 화면 오른쪽 아래 `PHONE OK`: 그 사람의 폰과 최근에 연락됨(폰의 hello 수신 또는 출발 신호 전달 성공). `PHONE --`: 아직 확인 못 함 또는 마지막 출발 신호 전달 실패. 보드를 켠 직후에는 폰이 hello를 보낼 때까지(폰의 Wi-Fi 재연결 때, 아니면 최대 60분) `PHONE --`이다. 데모 모드는 항상 `PHONE --`
 - 메인 스택(1KB) 때문에 큰 버퍼는 static에 둔다. 수치는 상위 폴더 README의 "RAM 사용량"
 
@@ -44,7 +44,7 @@ config.h의 `DEMO_MODE`가 1이면 WiFi와 API 키 없이 가짜 데이터로 �
 - secrets.h.example: WiFi·API 키·폰 공유 키의 예시. `secrets.h`로 복사해서 쓴다
 - Net.h/.cpp: WiFi, 날씨·버스·지하철 조회
 - Screens.h/.cpp: 화면 (Arduino_GFX, 바뀐 자리만 다시 그림)
-- Devices.h/.cpp: PIR, 문 센서, DHT11, LED 매트릭스, 서보
+- Devices.h/.cpp: PIR, 문 센서, DHT11, LED 매트릭스
 - travel_iface.h: 이동 시간 모듈과의 약속
 - travel_link.cpp: TravelLearn 라이브러리 연결 (DEMO_MODE 0이고 USE_TRAVEL_STUB 0일 때)
 - travel_stub.cpp: 가상 이동 시간 240초 (데모 모드이거나 USE_TRAVEL_STUB 1일 때)

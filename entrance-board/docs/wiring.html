@@ -6,17 +6,17 @@
 :root{
   --bg:#f4f6f3; --panel:#ffffff; --ink:#1b231f; --muted:#5a665e; --line:#cdd5ce; --accent:#0d7a68; --soft:#e7ece7;
   --w-5v:#e03131; --w-3v3:#f08c00; --w-gnd:#2c322f; --w-sck:#1c7ed6; --w-mosi:#7048e8; --w-cs:#0c9f8f; --w-dc:#d6336c;
-  --w-rst:#a15c2b; --w-sda:#2f9e44; --w-rrst:#ae3ec9; --w-miso:#1098ad; --w-dht:#9a8500; --w-servo:#5c940d; --w-pir:#4263eb; --w-door:#5f7d95;
+  --w-rst:#a15c2b; --w-sda:#2f9e44; --w-rrst:#ae3ec9; --w-miso:#1098ad; --w-dht:#9a8500; --w-pir:#4263eb; --w-door:#5f7d95;
   --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#111513; --panel:#1a201d; --ink:#e5ebe6; --muted:#9aa79f; --line:#34413a; --accent:#45c4aa; --soft:#232b27;
   --w-5v:#ff6b6b; --w-3v3:#ffa94d; --w-gnd:#d3dad5; --w-sck:#4dabf7; --w-mosi:#9775fa; --w-cs:#38d9a9; --w-dc:#f783ac;
-  --w-rst:#d9a066; --w-sda:#69db7c; --w-rrst:#da77f2; --w-miso:#3bc9db; --w-dht:#ffd43b; --w-servo:#a9e34b; --w-pir:#748ffc; --w-door:#99b3c9; color-scheme:dark } }
+  --w-rst:#d9a066; --w-sda:#69db7c; --w-rrst:#da77f2; --w-miso:#3bc9db; --w-dht:#ffd43b; --w-pir:#748ffc; --w-door:#99b3c9; color-scheme:dark } }
 :root[data-theme="dark"]{
   --bg:#111513; --panel:#1a201d; --ink:#e5ebe6; --muted:#9aa79f; --line:#34413a; --accent:#45c4aa; --soft:#232b27;
   --w-5v:#ff6b6b; --w-3v3:#ffa94d; --w-gnd:#d3dad5; --w-sck:#4dabf7; --w-mosi:#9775fa; --w-cs:#38d9a9; --w-dc:#f783ac;
-  --w-rst:#d9a066; --w-sda:#69db7c; --w-rrst:#da77f2; --w-miso:#3bc9db; --w-dht:#ffd43b; --w-servo:#a9e34b; --w-pir:#748ffc; --w-door:#99b3c9; color-scheme:dark }
+  --w-rst:#d9a066; --w-sda:#69db7c; --w-rrst:#da77f2; --w-miso:#3bc9db; --w-dht:#ffd43b; --w-pir:#748ffc; --w-door:#99b3c9; color-scheme:dark }
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.65;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
 .wrap{max-width:1220px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
@@ -68,15 +68,14 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     <p class="lead">모듈 핀마다 점퍼선 한 가닥이 어디로 가는지 그린 도면이다. 부품이 도착하기 전 초안이라, 모듈에 인쇄된 핀 이름을 보고 맞춰 연결한다.</p>
   </header>
   <ul class="rules">
-    <li>5V 어댑터는 보드의 배럴잭에 꽂지 않는다. DC 터미널을 거쳐 서보에만 연결한다.</li>
     <li>보드에서 화면과 RFID로 나가는 신호 6개(D7, D8, D9, D10, D11, D13)는 1kΩ·2kΩ 분압을 거친다.</li>
     <li>RC522 MISO와 PIR 출력은 74HCT125N을 거쳐 5V 신호로 보드에 들어간다. 74HCT125N의 1번(1OE)은 분압 전 D10에 연결한다.</li>
     <li>RC522는 3.3V에 연결하고 RST는 10kΩ으로 3.3V에 올린다(소프트웨어 리셋). 화면의 SDO 핀은 비워 둔다.</li>
-    <li>GND는 모든 모듈과 어댑터까지 한 줄로 묶는다.</li>
+    <li>GND는 모든 모듈까지 한 줄로 묶는다.</li>
   </ul>
   <section style="display:flex;flex-direction:column;gap:10px">
     <div class="bar"><h2>도면</h2><button type="button" id="clear" hidden>선택 해제</button></div>
-    <div class="board" id="board"><svg viewBox="0 0 1250 1776" width="1250" height="1776" role="img" aria-label="스마트 현관판 배선도">
+    <div class="board" id="board"><svg viewBox="0 0 1250 1492" width="1250" height="1492" role="img" aria-label="스마트 현관판 배선도">
 <rect class="uno" x="40" y="70" width="210" height="610" rx="10"/>
 <text x="56" y="98" class="h" text-anchor="start">Arduino UNO R4 WiFi</text>
 <text x="56" y="116" class="n" text-anchor="start">USB-C로 전원 공급</text>
@@ -106,8 +105,6 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <text x="236" y="524" class="p" text-anchor="end">D5</text>
 <rect class="pad" x="244" y="554" width="12" height="12" rx="2"/>
 <text x="236" y="564" class="p" text-anchor="end">D4</text>
-<rect class="pad" x="244" y="594" width="12" height="12" rx="2"/>
-<text x="236" y="604" class="p" text-anchor="end">D3</text>
 <rect class="pad" x="244" y="634" width="12" height="12" rx="2"/>
 <text x="236" y="644" class="p" text-anchor="end">D2</text>
 <rect class="bb" x="450" y="78" width="190" height="378" rx="10"/>
@@ -220,28 +217,13 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <text x="990" y="1274" class="p" text-anchor="start">DATA (S)</text>
 <rect class="pad" x="962" y="1290" width="12" height="12" rx="2"/>
 <text x="990" y="1300" class="p" text-anchor="start">GND (−)</text>
-<rect class="mod" x="968" y="1346" width="256" height="130" rx="10"/>
-<text x="990" y="1368" class="h" text-anchor="start">서보 SG90</text>
+<rect class="mod" x="968" y="1346" width="256" height="118" rx="10"/>
+<text x="990" y="1368" class="h" text-anchor="start">문 센서 MC-38</text>
 <rect class="pad" x="962" y="1386" width="12" height="12" rx="2"/>
-<text x="990" y="1396" class="p" text-anchor="start">주황 · 신호</text>
+<text x="990" y="1396" class="p" text-anchor="start">선 1</text>
 <rect class="pad" x="962" y="1412" width="12" height="12" rx="2"/>
-<text x="990" y="1422" class="p" text-anchor="start">빨강 · +</text>
-<rect class="pad" x="962" y="1438" width="12" height="12" rx="2"/>
-<text x="990" y="1448" class="p" text-anchor="start">갈색 · −</text>
-<rect class="mod" x="968" y="1494" width="256" height="118" rx="10"/>
-<text x="990" y="1516" class="h" text-anchor="start">문 센서 MC-38</text>
-<rect class="pad" x="962" y="1534" width="12" height="12" rx="2"/>
-<text x="990" y="1544" class="p" text-anchor="start">선 1</text>
-<rect class="pad" x="962" y="1560" width="12" height="12" rx="2"/>
-<text x="990" y="1570" class="p" text-anchor="start">선 2</text>
-<text x="990" y="1602" class="n" text-anchor="start">두 선은 극성이 없음</text>
-<rect class="mod" x="968" y="1630" width="256" height="118" rx="10"/>
-<text x="990" y="1652" class="h" text-anchor="start">DC 터미널 (5V 어댑터)</text>
-<rect class="pad" x="962" y="1670" width="12" height="12" rx="2"/>
-<text x="990" y="1680" class="p" text-anchor="start">+</text>
-<rect class="pad" x="962" y="1696" width="12" height="12" rx="2"/>
-<text x="990" y="1706" class="p" text-anchor="start">−</text>
-<text x="990" y="1738" class="n" text-anchor="start">콘덴서 1000µF를 +와 − 사이에</text>
+<text x="990" y="1422" class="p" text-anchor="start">선 2</text>
+<text x="990" y="1454" class="n" text-anchor="start">두 선은 극성이 없음</text>
 <path class="w" data-net="5V" style="--c:var(--w-5v)" d="M256 120H444"><title>5V 전원</title></path>
 <path class="w" data-net="3V3" style="--c:var(--w-3v3)" d="M256 160H444"><title>3.3V 전원</title></path>
 <path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M256 200H444"><title>GND</title></path>
@@ -265,8 +247,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 200.0H760.4V934H962"><title>GND</title></path>
 <path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 206.5H785.6V1148H962"><title>GND</title></path>
 <path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 213.0H710.0V1296H962"><title>GND</title></path>
-<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 219.5H777.2V1566H962"><title>GND</title></path>
-<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 226.0H768.8V1702H962"><title>GND</title></path>
+<path class="w" data-net="GND" style="--c:var(--w-gnd)" d="M640 219.5H777.2V1418H962"><title>GND</title></path>
 <path class="w" data-net="D13" style="--c:var(--w-sck)" d="M640 236.8H668.0V272H962"><title>SPI 클럭</title></path>
 <path class="w" data-net="D13" style="--c:var(--w-sck)" d="M640 243.2H844.4V460H962"><title>SPI 클럭</title></path>
 <path class="w" data-net="D11" style="--c:var(--w-mosi)" d="M640 276.8H810.8V246H962"><title>SPI 데이터 (보드→모듈)</title></path>
@@ -277,12 +258,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <path class="w" data-net="D10" style="--c:var(--w-sda)" d="M640 440.0H869.6V434H962"><title>RFID 선택 (분압 후)</title></path>
 <path class="w" data-net="D10D" style="--c:var(--w-sda)" d="M256 440H272V462H726.8V778H962"><title>RFID 선택 (분압 전, 74HCT125 출력 켜기)</title></path>
 <path class="w" data-net="D12" style="--c:var(--w-miso)" d="M256 480H718.4V830H962"><title>SPI 데이터 (74HCT125→보드)</title></path>
-<path class="w" data-net="D5" style="--c:var(--w-door)" d="M256 520H676.4V1540H962"><title>문 센서</title></path>
+<path class="w" data-net="D5" style="--c:var(--w-door)" d="M256 520H676.4V1392H962"><title>문 센서</title></path>
 <path class="w" data-net="D4" style="--c:var(--w-dht)" d="M256 560H701.6V1270H962"><title>온습도 데이터</title></path>
-<path class="w" data-net="D3" style="--c:var(--w-servo)" d="M256 600H693.2V1392H962"><title>서보 신호</title></path>
 <path class="w" data-net="D2" style="--c:var(--w-pir)" d="M256 640H684.8V908H962"><title>PIR 출력 (74HCT125→보드)</title></path>
-<path class="w" data-net="SV" style="--c:var(--w-5v)" d="M962 1676H946V1418H962"><title>서보 전원 +</title></path>
-<path class="w" data-net="SG" style="--c:var(--w-gnd)" d="M962 1702H954V1444H962"><title>서보 전원 −</title></path>
 <path class="w" data-net="MISO" style="--c:var(--w-miso)" d="M962 512H942V804H962"><title>RC522 MISO → 74HCT125</title></path>
 <path class="w" data-net="PIRO" style="--c:var(--w-pir)" d="M962 1122H930V882H962"><title>PIR 출력 → 74HCT125</title></path>
 <path class="w" data-net="R10K" style="--c:var(--w-3v3)" d="M962 616H952V590H962" stroke-dasharray="5 4"><title>10kΩ 풀업</title></path>
@@ -308,7 +286,6 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>PIR HC-SR501</td><td class="mono">GND</td></tr>
 <tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>온습도 DHT11</td><td class="mono">GND (−)</td></tr>
 <tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>문 센서 MC-38</td><td class="mono">선 2</td></tr>
-<tr data-net="GND"><td><span class="sw" style="--c:var(--w-gnd)"></span>GND</td><td>분배 줄</td><td>DC 터미널 (5V 어댑터)</td><td class="mono">−</td></tr>
 <tr data-net="D13"><td><span class="sw" style="--c:var(--w-sck)"></span>D13 · SCK</td><td>분압 1kΩ·2kΩ</td><td>3.5인치 IPS ILI9488 SPI</td><td class="mono">SCK</td></tr>
 <tr data-net="D13"><td><span class="sw" style="--c:var(--w-sck)"></span>D13 · SCK</td><td>분압 1kΩ·2kΩ</td><td>RFID RC522</td><td class="mono">SCK</td></tr>
 <tr data-net="D11"><td><span class="sw" style="--c:var(--w-mosi)"></span>D11 · MOSI</td><td>분압 1kΩ·2kΩ</td><td>3.5인치 IPS ILI9488 SPI</td><td class="mono">SDI(MOSI)</td></tr>
@@ -321,13 +298,10 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <tr data-net="D12"><td><span class="sw" style="--c:var(--w-miso)"></span>D12 · MISO</td><td>74HCT125 출력</td><td>74HCT125N (DIP 14핀)</td><td class="mono">3 1Y</td></tr>
 <tr data-net="D5"><td><span class="sw" style="--c:var(--w-door)"></span>D5</td><td>직결</td><td>문 센서 MC-38</td><td class="mono">선 1</td></tr>
 <tr data-net="D4"><td><span class="sw" style="--c:var(--w-dht)"></span>D4</td><td>직결</td><td>온습도 DHT11</td><td class="mono">DATA (S)</td></tr>
-<tr data-net="D3"><td><span class="sw" style="--c:var(--w-servo)"></span>D3</td><td>직결</td><td>서보 SG90</td><td class="mono">주황 · 신호</td></tr>
 <tr data-net="D2"><td><span class="sw" style="--c:var(--w-pir)"></span>D2</td><td>74HCT125 출력</td><td>74HCT125N (DIP 14핀)</td><td class="mono">6 2Y</td></tr>
 <tr data-net="MISO"><td><span class="sw" style="--c:var(--w-miso)"></span>RC522 MISO</td><td>모듈끼리</td><td>74HCT125N</td><td class="mono">2 1A</td></tr>
 <tr data-net="PIRO"><td><span class="sw" style="--c:var(--w-pir)"></span>PIR OUT</td><td>모듈끼리</td><td>74HCT125N</td><td class="mono">5 2A</td></tr>
-<tr data-net="R10K"><td><span class="sw" style="--c:var(--w-3v3)"></span>RC522 3.3V</td><td>10kΩ</td><td>RFID RC522</td><td class="mono">RST</td></tr>
-<tr data-net="SV"><td><span class="sw" style="--c:var(--w-5v)"></span>DC 터미널 +</td><td>직결</td><td>서보 SG90</td><td class="mono">빨강 · +</td></tr>
-<tr data-net="SG"><td><span class="sw" style="--c:var(--w-gnd)"></span>DC 터미널 −</td><td>직결</td><td>서보 SG90</td><td class="mono">갈색 · −</td></tr></tbody>
+<tr data-net="R10K"><td><span class="sw" style="--c:var(--w-3v3)"></span>RC522 3.3V</td><td>10kΩ</td><td>RFID RC522</td><td class="mono">RST</td></tr></tbody>
     </table></div>
   </section>
 </div>

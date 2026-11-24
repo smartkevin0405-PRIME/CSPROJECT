@@ -38,7 +38,7 @@ bool netReady() { return true; }
 uint32_t netEpoch() { return 0; }
 
 bool fetchWeather(WeatherInfo& out) {
-  static uint8_t n = 0;                   // 부를 때마다 날씨를 바꿔 다이얼 동작을 확인한다
+  static uint8_t n = 0;                   // 부를 때마다 날씨를 바꿔 화면 NEXT 3H 표시를 확인한다
   out.kind = (WeatherKind)(n++ % 4);
   out.ok = true;
   out.tempC = 12;
