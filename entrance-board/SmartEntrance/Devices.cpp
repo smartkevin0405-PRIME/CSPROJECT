@@ -1,12 +1,9 @@
 // Devices.cpp
 // [생성형 AI 활용] 이 파일은 Claude의 도움을 받아 작성했다.
 #include "Devices.h"
-#include <Servo.h>
 #include "Arduino_LED_Matrix.h"
 
 static ArduinoLEDMatrix matrix;
-static Servo dial;
-static uint32_t dialDetachAt = 0;         // 이 시각이 지나면 서보 신호를 끊는다 (0 = 이미 끊김)
 
 // ---- 문 센서 디바운스 ----
 static bool doorOpen = false;
@@ -29,10 +26,6 @@ void devicesLoop() {
   if (raw != doorOpen && millis() - doorChangedAt >= 50) {
     doorOpen = raw;
     if (doorOpen) doorOpenedFlag = true;
-  }
-  if (dialDetachAt != 0 && (int32_t)(millis() - dialDetachAt) >= 0) {
-    dial.detach();                        // 떨림과 대기 전류를 줄인다
-    dialDetachAt = 0;
   }
 }
 
@@ -109,13 +102,4 @@ void matrixShowNone() {
   for (uint8_t c = 3; c < 6; c++) frame[3][c] = 1;
   for (uint8_t c = 7; c < 10; c++) frame[3][c] = 1;
   matrix.renderBitmap(frame, 8, 12);
-}
-
-// ---- 서보 다이얼 ----
-void dialSet(WeatherKind kind) {
-  if (kind >= WX_UNKNOWN) return;
-  if (!dial.attached()) dial.attach(PIN_SERVO);
-  dial.write(DIAL_ANGLE[kind]);
-  dialDetachAt = millis() + 700;          // 바늘이 다 움직인 뒤 신호를 끊는다
-  if (dialDetachAt == 0) dialDetachAt = 1;
 }

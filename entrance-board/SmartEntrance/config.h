@@ -19,7 +19,6 @@
 // 분압: 보드 → 화면·RC522로 나가는 6개(D7, D8, D9, D10, D11, D13)는 1kΩ + 2kΩ로 약 3.3V
 // 74HCT125: RC522 MISO → D12, PIR OUT → D2 를 5V 신호로 바꾼다
 const uint8_t PIN_PIR      = 2;   // PIR 출력 (74HCT125 2번 채널을 거쳐 5V)
-const uint8_t PIN_SERVO    = 3;   // 날씨 다이얼 서보
 const uint8_t PIN_DHT      = 4;   // DHT11
 const uint8_t PIN_DOOR     = 5;   // 문 열림 센서 MC-38 (내부 풀업)
 const uint8_t PIN_TFT_RST  = 7;   // 화면 RESET (분압)
@@ -50,9 +49,8 @@ const uint32_t WEATHER_MS       = 600000;  // 날씨 갱신 간격
 const uint32_t CANCEL_WINDOW_MS = 90000;   // 출발 후 이 안에 같은 사람이 다시 태그하면 외출 취소
 const uint32_t HTTP_TIMEOUT_MS  = 8000;    // API 요청 1건(연결부터 응답 끝까지) 전체 제한 시간
 
-// ---------- 날씨 다이얼 각도 ----------
+// ---------- 날씨 종류 (화면 NEXT 3H 표시) ----------
 enum WeatherKind : uint8_t { WX_SUNNY = 0, WX_CLOUDY = 1, WX_RAIN = 2, WX_SNOW = 3, WX_UNKNOWN = 4 };
-const uint8_t DIAL_ANGLE[4] = { 22, 67, 112, 157 };
 
 // ---------- 기상청 격자 좌표 (사는 동네 값으로 바꾼다) ----------
 const int KMA_NX = 59;

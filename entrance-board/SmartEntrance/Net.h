@@ -8,9 +8,9 @@ struct WeatherInfo {
   bool        ok;       // 조회에 성공했는지
   int8_t      tempC;    // 외부 기온
   uint8_t     sky;      // 앞으로 3시간 중 가장 흐린 SKY 코드 (1 맑음, 3 구름많음, 4 흐림)
-  uint8_t     pty;      // 앞으로 3시간 중 처음 나온 강수형태 코드 (0 없음). 다이얼·화면용
+  uint8_t     pty;      // 앞으로 3시간 중 처음 나온 강수형태 코드 (0 없음). 화면용
   uint8_t     nowPty;   // 가장 가까운 예보 시각의 강수형태 코드 (0 없음). 이동 시간 학습용
-  WeatherKind kind;     // 다이얼이 가리킬 칸
+  WeatherKind kind;     // 화면 NEXT 3H에 표시할 날씨
 };
 
 bool     netBegin();                    // WiFi 연결 (최대 15초 기다림)
