@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>스마트 현관판 포스터</title>
+<style>
+@page { size: 250mm 353mm; margin: 0; }
+:root{
+  --ink:#18212c; --ink2:#2a3644; --paper:#f5f1e8; --card:#fffdf8; --line:#ddd5c4;
+  --amber:#e39a2d; --amber-soft:#fbead0; --cyan:#22a7bd; --green:#2f9e57; --red:#d6483f; --muted:#6b7380;
+  --scr:#0b0f14;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:250mm;height:353mm;background:var(--paper);color:var(--ink);
+  font-family:"Noto Sans CJK KR","Noto Sans KR",sans-serif;font-size:12.6px;line-height:1.5;word-break:keep-all}
+.page{width:250mm;height:353mm;display:flex;flex-direction:column;overflow:hidden}
+.mono{font-family:"DejaVu Sans Mono",monospace}
+
+/* header */
+header{background:var(--ink);color:#fff;padding:7mm 12mm 5mm;position:relative}
+header .kicker{font-family:Inter,sans-serif;font-weight:600;letter-spacing:.22em;font-size:11px;color:var(--amber)}
+header h1{font-size:44px;font-weight:900;letter-spacing:-.02em;line-height:1.1;margin-top:2mm}
+header h1 span{color:var(--amber)}
+header .sub{font-size:15.5px;font-weight:500;margin-top:1.5mm;color:#e9e4d8}
+header .tags{display:flex;flex-wrap:wrap;gap:2mm;margin-top:3mm}
+header .tags b{font-weight:500;font-size:11.5px;border:1px solid #4a5868;border-radius:99px;padding:1px 10px;color:#cfd6de}
+header .door{position:absolute;right:12mm;top:6mm;width:26mm;height:26mm}
+
+main{flex:1;padding:4.5mm 12mm 0;display:flex;flex-direction:column;gap:3.5mm}
+.sec-h{display:flex;align-items:center;gap:3mm;margin-bottom:2mm}
+.sec-h .n{width:8mm;height:8mm;border-radius:50%;background:var(--amber);color:#fff;font-weight:900;font-size:17px;display:grid;place-items:center;flex:none}
+.sec-h h2{font-size:19px;font-weight:900;letter-spacing:-.01em}
+.sec-h .en{font-family:Inter,sans-serif;font-size:10.5px;letter-spacing:.18em;color:var(--muted);font-weight:600;margin-left:auto}
+
+.row1{display:grid;grid-template-columns:84mm 1fr;gap:5mm}
+.topic p{margin-bottom:2.2mm}
+.topic .q{background:var(--card);border-left:4px solid var(--amber);padding:2mm 3mm;border-radius:0 6px 6px 0;font-size:13px;margin-bottom:3mm}
+.topic .q b{color:var(--amber)}
+.topic strong{font-weight:700}
+.flow{display:flex;flex-direction:column;gap:1.6mm;margin-top:2.5mm}
+.flow div{display:flex;gap:2.5mm;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1.4mm 2.5mm;font-size:12px}
+.flow i{font-style:normal;font-weight:900;color:var(--cyan);width:4.5mm;flex:none}
+
+.figure{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3mm 3mm 2mm;position:relative}
+.figure svg{display:block;width:100%;height:auto}
+.figure .cap{font-size:10.5px;color:var(--muted);text-align:right;margin-top:1mm}
+
+/* features */
+.feats{display:grid;grid-template-columns:repeat(3,1fr);gap:2.6mm}
+.feat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:2.4mm 2.8mm;display:flex;gap:2.6mm}
+.feat .ic{width:10mm;height:10mm;border-radius:8px;background:var(--ink);display:grid;place-items:center;flex:none}
+.feat .ic svg{width:6.5mm;height:6.5mm}
+.feat h3{font-size:13.4px;font-weight:800;line-height:1.3;margin-bottom:.8mm}
+.feat p{font-size:11px;line-height:1.42;color:#2d3540}
+.feat .part{font-family:Inter,sans-serif;font-size:9.5px;color:var(--muted);font-weight:600;letter-spacing:.04em;display:block;margin-top:1mm}
+
+/* usage */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm}
+.step{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:2.4mm;display:flex;flex-direction:column;gap:1.6mm}
+.step .t{display:flex;gap:2mm;align-items:baseline}
+.step .t b{font-family:Inter,sans-serif;font-size:22px;font-weight:800;color:var(--amber);line-height:1}
+.step .t h3{font-size:13.6px;font-weight:800;line-height:1.3}
+.step p{font-size:11px;line-height:1.45}
+.scr{background:var(--scr);border-radius:4px;border:2px solid #2b333d;aspect-ratio:2.8/1;color:#fff;font-family:"DejaVu Sans Mono",monospace;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:1.5mm;gap:1mm}
+.scr .big{font-size:13px;font-weight:700}
+.scr .sm{font-size:7px;color:#8b949e}
+
+.row3{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+.read{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3mm}
+.read h3,.box h3{font-size:14px;font-weight:800;margin-bottom:2mm}
+.readwrap{display:grid;grid-template-columns:74mm 1fr;gap:3mm;align-items:start}
+.info{background:var(--scr);border:3px solid #2b333d;border-radius:5px;padding:2.4mm 2.8mm;font-family:"DejaVu Sans Mono",monospace;color:#fff;font-size:9.4px;line-height:1.35;position:relative}
+.info .l{white-space:pre;position:relative}
+.info .hr{border-top:1px solid #59616b;margin:1.2mm 0}
+.info .tag{position:absolute;right:-2.2mm;transform:translateX(100%);font-family:"Noto Sans CJK KR",sans-serif}
+.c-y{color:#f0d34a}.c-c{color:#46d4e6}.c-g{color:#4fd17a}.c-r{color:#ff6b61}.c-gr{color:#9aa3ad}
+.marks{list-style:none;display:grid;grid-template-columns:1fr;gap:1.4mm;font-size:11.2px}
+.marks li{display:flex;gap:1.8mm;align-items:flex-start}
+.marks li em{font-style:normal;flex:none;width:4.6mm;height:4.6mm;border-radius:50%;background:var(--amber-soft);color:var(--ink);font-size:9px;font-weight:800;display:grid;place-items:center;margin-top:.3mm}
+.pin{display:inline-grid;place-items:center;width:4mm;height:4mm;border-radius:50%;background:var(--amber);color:#fff;font-size:8px;font-weight:800;font-family:Inter,sans-serif}
+
+.side{display:flex;flex-direction:column;gap:3mm}
+.box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3mm}
+.box ol{padding-left:4.5mm;font-size:11.2px;display:flex;flex-direction:column;gap:.8mm}
+table.trbl{width:100%;border-collapse:collapse;font-size:11.2px}
+table.trbl td{padding:1mm 1mm;border-top:1px solid var(--line);vertical-align:top}
+table.trbl tr:first-child td{border-top:0}
+table.trbl td:first-child{font-family:"DejaVu Sans Mono",monospace;font-size:10px;font-weight:700;white-space:nowrap;width:31mm}
+
+footer{margin-top:auto;padding:2.2mm 12mm 3.4mm;border-top:1px solid var(--line);display:flex;gap:6mm;font-size:9.6px;color:var(--muted);line-height:1.45}
+footer b{color:var(--ink2);font-weight:700}
+footer .c1{flex:1.3}footer .c2{flex:1}
+</style></head>
+<body><div class="page">
+
+<header>
+  <div class="kicker">PHYSICAL COMPUTING PROJECT · ARDUINO UNO R4 WiFi</div>
+  <h1>스마트 <span>현관판</span></h1>
+  <p class="sub">현관에서 카드 한 번. 내 버스·지하철 도착 시간과 날씨, 지금 나가도 되는지까지.</p>
+  <svg class="door" viewBox="0 0 100 100" aria-hidden="true">
+    <rect x="22" y="8" width="56" height="88" rx="3" fill="none" stroke="#e39a2d" stroke-width="4"/>
+    <rect x="30" y="18" width="40" height="26" rx="2" fill="#0b0f14" stroke="#4a5868" stroke-width="2"/>
+    <text x="50" y="35" font-size="8" fill="#46d4e6" text-anchor="middle" font-family="DejaVu Sans Mono">3m20s</text>
+    <circle cx="50" cy="58" r="7" fill="none" stroke="#e9e4d8" stroke-width="2.5"/>
+    <path d="M44 52a9 9 0 0 1 12 0M41 49a13 13 0 0 1 18 0" fill="none" stroke="#e9e4d8" stroke-width="2"/>
+    <circle cx="70" cy="64" r="3" fill="#e39a2d"/>
+  </svg>
+</header>
+
+<main>
+  <!-- 1 & 2 -->
+  <section class="row1">
+    <div class="topic">
+      <div class="sec-h"><span class="n">1</span><h2>주제</h2></div>
+      <p class="q">아침마다 신발 신다 말고 <b>폰으로 버스 앱, 날씨 앱</b>을 따로 켜 본 적 있나요?</p>
+      <p>현관 벽에 붙이는 알림판입니다. 집을 나서기 직전에 <strong>카드만 찍으면</strong> 그 사람이 타는 정류장의 버스·지하철 도착 시간과 바깥 날씨를 한 화면에 보여 줍니다.</p>
+      <p>여기에 폰 앱이 <strong>집에서 정류장까지 실제로 걸린 시간</strong>을 재서 알려 주면, 현관판이 사람·날씨·시간대별로 기억해 두었다가 <strong>“지금 나가면 몇 분 여유인지”</strong>를 계산합니다.</p>
+      <div class="box" style="margin-top:2.5mm">
+        <h3>처음 한 번만 하는 준비</h3>
+        <ol>
+          <li>현관 문 옆 벽에 판을 걸고, 문 센서 두 조각을 문과 문틀에 마주 붙입니다.</li>
+          <li>보드에 USB-C 5V 충전기를 꽂습니다. 화면에 STARTING이 뜬 뒤 대기 화면이 나오면 성공입니다.</li>
+          <li>가족마다 카드 1장씩 나눠 갖고, 각자 폰에 <b>TravelLearn</b> 앱을 설치해 현관판 Wi-Fi 주소와 정류장을 등록합니다.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-h"><span class="n">2</span><h2>최종 산출물</h2><span class="en">FINAL BUILD</span></div>
+      <div class="figure">
+      <svg viewBox="0 0 520 330" font-family="Noto Sans CJK KR, sans-serif">
+        <defs>
+          <pattern id="wall" width="14" height="14" patternUnits="userSpaceOnUse"><rect width="14" height="14" fill="#efe9dc"/><path d="M0 14L14 0" stroke="#e5ddcc" stroke-width="1"/></pattern>
+        </defs>
+        <rect width="520" height="330" fill="url(#wall)" rx="6"/>
+        <!-- door -->
+        <rect x="392" y="18" width="112" height="300" fill="#b98b5c" stroke="#8a6440" stroke-width="3"/>
+        <rect x="404" y="34" width="88" height="120" fill="none" stroke="#a37a4f" stroke-width="2"/>
+        <rect x="404" y="168" width="88" height="130" fill="none" stroke="#a37a4f" stroke-width="2"/>
+        <circle cx="412" cy="168" r="6" fill="#d9c28a" stroke="#8a6440"/>
+        <!-- door sensor -->
+        <rect x="380" y="108" width="10" height="26" rx="2" fill="#fff" stroke="#999"/>
+        <rect x="394" y="108" width="10" height="26" rx="2" fill="#fff" stroke="#999"/>
+        <!-- panel -->
+        <rect x="36" y="22" width="300" height="296" rx="8" fill="#1b1f25" stroke="#0e1115" stroke-width="3"/>
+        <rect x="36" y="22" width="300" height="296" rx="8" fill="none" stroke="#3a424c" stroke-width="1"/>
+        <!-- PIR -->
+        <rect x="166" y="34" width="40" height="22" rx="3" fill="#2d5f3a"/>
+        <circle cx="186" cy="45" r="13" fill="#f4f4f0" stroke="#cfcfc8"/>
+        <path d="M178 45a8 8 0 0 1 16 0" fill="none" stroke="#d8d8d0"/>
+        <!-- screen -->
+        <rect x="64" y="66" width="244" height="164" rx="4" fill="#c33" />
+        <rect x="68" y="70" width="236" height="156" fill="#0b0f14"/>
+        <g font-family="DejaVu Sans Mono, monospace">
+          <text x="76" y="88" font-size="11" fill="#fff" font-weight="700">HELLO, USER1</text>
+          <text x="76" y="102" font-size="8" fill="#46d4e6">OUT 7C  NEXT 3H: RAIN</text>
+          <line x1="68" y1="108" x2="304" y2="108" stroke="#59616b"/>
+          <text x="76" y="122" font-size="10" fill="#f0d34a" font-weight="700">BUS 5511</text>
+          <text x="76" y="136" font-size="10" fill="#fff">3m20s  next 12m05s</text>
+          <text x="76" y="148" font-size="7.5" fill="#4fd17a">spare 1m10s before leaving</text>
+          <text x="76" y="166" font-size="10" fill="#f0d34a" font-weight="700">SILLIM L2</text>
+          <text x="76" y="180" font-size="10" fill="#fff">5m40s  next 9m10s</text>
+          <text x="76" y="192" font-size="7.5" fill="#ff6b61">too late by 0m40s</text>
+          <text x="76" y="216" font-size="7.5" fill="#9aa3ad">back in 18s</text>
+          <text x="296" y="216" font-size="7.5" fill="#4fd17a" text-anchor="end">PHONE OK</text>
+        </g>
+        <!-- card mark -->
+        <rect x="132" y="244" width="108" height="56" rx="6" fill="none" stroke="#e39a2d" stroke-width="2" stroke-dasharray="5 4"/>
+        <path d="M172 266a10 10 0 0 1 14 0M167 261a17 17 0 0 1 24 0M177 271a4 4 0 0 1 4 0" fill="none" stroke="#e39a2d" stroke-width="2.2" stroke-linecap="round"/>
+        <text x="186" y="292" font-size="11" fill="#e39a2d" text-anchor="middle" font-weight="700">여기에 카드</text>
+        <!-- DHT11 -->
+        <rect x="52" y="246" width="24" height="30" rx="2" fill="#2f8fd0"/>
+        <g stroke="#1d6ea6" stroke-width="1"><line x1="56" y1="252" x2="72" y2="252"/><line x1="56" y1="258" x2="72" y2="258"/><line x1="56" y1="264" x2="72" y2="264"/><line x1="56" y1="270" x2="72" y2="270"/></g>
+        <!-- UNO R4 with matrix -->
+        <rect x="258" y="250" width="68" height="52" rx="4" fill="#1f7f8c" stroke="#14606a"/>
+        <rect x="270" y="260" width="40" height="27" rx="2" fill="#0d3a40"/>
+        <g fill="#ff4b3e">
+          <!-- "7" on 12x8 matrix scaled -->
+          <rect x="282" y="263" width="3" height="3"/><rect x="285" y="263" width="3" height="3"/><rect x="288" y="263" width="3" height="3"/><rect x="291" y="263" width="3" height="3"/>
+          <rect x="291" y="266" width="3" height="3"/><rect x="288" y="269" width="3" height="3"/><rect x="288" y="272" width="3" height="3"/><rect x="285" y="275" width="3" height="3"/><rect x="285" y="278" width="3" height="3"/><rect x="285" y="281" width="3" height="3"/>
+        </g>
+        <g stroke="#18212c" stroke-width="1.2">
+          <line x1="206" y1="45" x2="349" y2="41"/><line x1="308" y1="150" x2="349" y2="146"/><line x1="384" y1="121" x2="367" y2="121"/>
+        </g>
+        <g font-size="10.5" font-weight="800" fill="#fff">
+                    <circle cx="358" cy="41" r="9" fill="#e39a2d"/><text x="358" y="45" text-anchor="middle">A</text>
+          <circle cx="358" cy="146" r="9" fill="#e39a2d"/><text x="358" y="150" text-anchor="middle">B</text>
+          <circle cx="250" cy="236" r="9" fill="#e39a2d"/><text x="250" y="240" text-anchor="middle">C</text>
+          <circle cx="64" cy="236" r="9" fill="#e39a2d"/><text x="64" y="240" text-anchor="middle">D</text>
+          <circle cx="358" cy="121" r="9" fill="#e39a2d"/><text x="358" y="125" text-anchor="middle">E</text>
+          <circle cx="342" cy="276" r="9" fill="#e39a2d"/><text x="342" y="280" text-anchor="middle">F</text>
+        </g>
+        <!-- reading markers on screen -->
+        <g font-size="8.5" font-weight="800" fill="#18212c" font-family="Inter, sans-serif">
+          <circle cx="218" cy="99" r="6.5" fill="#fbead0"/><text x="218" y="102" text-anchor="middle">1</text>
+          <circle cx="140" cy="119" r="6.5" fill="#fbead0"/><text x="140" y="122" text-anchor="middle">2</text>
+          <circle cx="215" cy="145" r="6.5" fill="#fbead0"/><text x="215" y="148" text-anchor="middle">3</text>
+          <circle cx="160" cy="213" r="6.5" fill="#fbead0"/><text x="160" y="216" text-anchor="middle">4</text>
+        </g>
+      </svg>
+      <div class="legend" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6mm 3mm;font-size:10.6px;margin-top:1.6mm">
+        <div><span class="pin">A</span> 인체감지 센서 (PIR)</div>
+        <div><span class="pin">B</span> 3.5인치 컬러 화면</div>
+        <div><span class="pin">C</span> 카드 리더 (RFID)</div>
+        <div><span class="pin">D</span> 실내 온습도 센서</div>
+        <div><span class="pin">E</span> 문 열림 센서</div>
+        <div><span class="pin">F</span> 보드 LED: 바깥 기온</div>
+      </div>
+      <div class="cap">완성 예상도 · 검정 폼보드 벽걸이판 앞면에 모듈, 뒤쪽에 보드와 배선</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section>
+    <div class="sec-h"><span class="n">3</span><h2>핵심 기능</h2><span class="en">KEY FEATURES</span></div>
+    <div class="feats">
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#e39a2d" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></div>
+        <div><h3>다가오면 깨어나는 화면</h3><p>사람이 오면 “TAG YOUR CARD” 안내가 뜨고, 평소엔 실내 온도·습도를 보여 줍니다.</p><span class="part">PIR · DHT11</span></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#e39a2d" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h4M7 14h7"/></svg></div>
+        <div><h3>카드로 가족 구분</h3><p>카드·키링의 고유 번호로 최대 4명을 구분해 사람마다 다른 정류장을 보여 줍니다.</p><span class="part">RFID RC522</span></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#e39a2d" stroke-width="2"><rect x="5" y="3" width="14" height="15" rx="3"/><path d="M5 12h14M8 21l1-3M16 21l-1-3"/><circle cx="9" cy="15" r=".8" fill="#e39a2d"/><circle cx="15" cy="15" r=".8" fill="#e39a2d"/></svg></div>
+        <div><h3>실시간 버스·지하철</h3><p>내 정류장에 오는 첫 차와 다음 차의 남은 시간을 1초마다 줄여 가며 보여 줍니다.</p><span class="part">서울시 버스·지하철 API</span></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#e39a2d" stroke-width="2"><path d="M7 17a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1A4 4 0 0 1 17 17z"/><path d="M9 20l-1 2M13 20l-1 2M17 20l-1 2"/></svg></div>
+        <div><h3>날씨를 화면과 LED로</h3><p>바깥 기온과 3시간 뒤 날씨(맑음·흐림·비·눈)를 화면에, 기온은 보드 LED에도 띄웁니다.</p><span class="part">기상청 초단기예보 API · 내장 LED 매트릭스</span></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#e39a2d" stroke-width="2"><path d="M5 21V3h10v18"/><path d="M15 6l4 2v13"/><circle cx="12" cy="12" r="1" fill="#e39a2d"/></svg></div>
+        <div><h3>문이 열리면 외출로 인식</h3><p>카드를 찍고 2분 안에 문을 열면 외출로 보고 폰에 출발 신호를 보냅니다.</p><span class="part">마그네틱 문 센서 MC-38</span></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#e39a2d" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M10 18h4"/><path d="M12 6v5l3 2"/></svg></div>
+        <div><h3>걷는 시간을 배우는 여유 시간</h3><p>폰 앱이 잰 정류장까지의 시간을 사람·날씨·시간대별로 쌓아 “몇 분 여유”를 계산합니다.</p><span class="part">Android 앱 + 집 Wi-Fi</span></div></div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section>
+    <div class="sec-h"><span class="n">4</span><h2>사용 방법</h2><span class="en">HOW TO USE</span></div>
+    <div class="steps">
+      <div class="step"><div class="t"><b>1</b><h3>현관판 앞에 선다</h3></div>
+        <div class="scr"><span class="big" style="color:#f0d34a">TAG YOUR CARD</span><span class="sm">Hold the card on the mark below</span></div>
+        <p>사람을 감지하면 안내가 뜹니다. 20초간 아무도 없으면 대기 화면으로 돌아가요.</p></div>
+      <div class="step"><div class="t"><b>2</b><h3>내 카드를 댄다</h3></div>
+        <div class="scr"><span class="big" style="color:#46d4e6">LOADING</span><span class="sm">USER1</span></div>
+        <p>화면 아래 <b>“여기에 카드”</b> 표시에 카드나 키링을 1초 대면 정보를 불러옵니다.</p></div>
+      <div class="step"><div class="t"><b>3</b><h3>내 정보를 확인한다</h3></div>
+        <div class="scr" style="align-items:flex-start;text-align:left;justify-content:flex-start;padding:2mm"><span style="font-size:8px;font-weight:700">HELLO, USER1</span><span style="font-size:6px;color:#46d4e6">OUT 7C  NEXT 3H: RAIN</span><span style="font-size:7px;color:#f0d34a;margin-top:.6mm">BUS 5511</span><span style="font-size:7px">3m20s next 12m05s</span><span style="font-size:5.5px;color:#4fd17a">spare 1m10s before leaving</span></div>
+        <p>25초 동안 표시됩니다. 읽는 법은 아래 <b>“정보 화면 읽는 법”</b>을 보세요.</p></div>
+      <div class="step"><div class="t"><b>4</b><h3>문을 열고 나간다</h3></div>
+        <div class="scr"><span class="big" style="color:#4fd17a">HAVE A NICE DAY</span></div>
+        <p>카드를 찍고 <b>2분 안에</b> 문을 열면 외출로 기록되고, 폰이 정류장까지 시간을 잽니다.</p></div>
+    </div>
+  </section>
+
+  <section class="row3">
+    <div class="read">
+      <h3>정보 화면 읽는 법 <span style="font-weight:500;font-size:11px;color:var(--muted)">(② 그림 속 화면의 번호)</span></h3>
+        <ul class="marks">
+          <li><em>1</em><span><b>OUT 7C</b> 바깥 기온 7°C, <b>NEXT 3H</b> 앞으로 3시간 날씨 (SUNNY 맑음 · CLOUDY 흐림 · RAIN 비 · SNOW 눈)</span></li>
+          <li><em>2</em><span><b>노란 글씨</b> 내 정류장·노선. 그 아래 첫 차와 다음 차까지 남은 시간 (30초 미만이면 NOW)</span></li>
+          <li><em>3</em><span><b class="c-g" style="color:var(--green)">초록</b> spare = 지금 나가도 남는 여유 시간 / <b style="color:var(--red)">빨강</b> too late = 걸어가면 놓치는 시간</span></li>
+          <li><em>4</em><span><b>back in</b> 대기 화면으로 돌아가기까지 남은 초, <b>PHONE OK</b> 내 폰 앱과 연결됨</span></li>
+        </ul>
+    </div>
+
+    <div class="side">
+      <div class="box">
+        <h3>이런 화면이 나오면</h3>
+        <table class="trbl">
+          <tr><td style="color:var(--red)">UNKNOWN CARD</td><td>등록되지 않은 카드입니다. 내 카드인지 확인하세요.</td></tr>
+          <tr><td style="color:var(--red)">NO DATA</td><td>인터넷 연결이 끊겼습니다. 공유기를 확인하세요. 30초마다 다시 연결합니다.</td></tr>
+          <tr><td style="color:#b08a00">TRIP CANCELED</td><td>나갔다가 90초 안에 다시 카드를 대서 외출이 취소됐습니다.</td></tr>
+          <tr><td>PHONE --</td><td>폰 앱과 연결 전입니다. 정보는 그대로 볼 수 있습니다.</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="c1"><b>구성</b> Arduino UNO R4 WiFi · 3.5인치 ILI9488 SPI 화면 · RFID RC522 · 인체감지 HC-SR501 · 온습도 DHT11 · 문 센서 MC-38 · 74HCT125N과 1kΩ/2kΩ 분압 저항(5V↔3.3V 신호 변환) · Android 앱(TravelLearn)</div>
+  <div class="c2"><b>데이터</b> 기상청 초단기예보 · 서울시 버스 정류소별 도착 · 서울시 지하철 실시간 도착 정보<br><b>코드</b> github.com/smartkevin0405-PRIME/CSPROJECT · 생성형 AI(Claude) 도움을 받아 작성</div>
+</footer>
+</div></body></html>
