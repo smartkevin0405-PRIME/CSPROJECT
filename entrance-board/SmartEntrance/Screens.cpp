@@ -1,17 +1,18 @@
 // Screens.cpp  화면 라이브러리: Arduino_GFX (GFX Library for Arduino)
-// SPI를 분압 저항으로 낮춘 상태라 500kHz에서 시작한다. 이 속도에서 화면 전체를 칠하면 약 7초가 걸려서
-// fillScreen은 부팅할 때 한 번만 쓴다. 그 뒤로는
+// 화면: 3.5인치 8비트 병렬 실드, 칩 HX8357B (2026-11-26 실물 시험에서 확인)
+// UNO R4는 MCUFRIEND_kbv를 지원하지 않아 Arduino_GFX의 소프트웨어 8비트 병렬 버스(Arduino_SWPAR8)를 쓴다.
+// 이 방식은 화면 전체를 칠하는 데 몇 초가 걸려서 fillScreen은 부팅할 때 한 번만 쓰고, 그 뒤로는
 //  1) 글자를 쓸 때마다 그 자리(상자)를 기억해 두고, 화면이 바뀔 때는 기억한 상자만 검은색으로 지운다
 //  2) 같은 자리에 같은 글자·색을 다시 쓰라고 하면 건너뛴다 (매초 부르는 카운트다운·도착 시간)
 //  3) 새 글자가 이전보다 짧으면 남은 꼬리만 지운다
 // [생성형 AI 활용] 이 파일은 Claude의 도움을 받아 작성했다.
 #include "Screens.h"
-#include <SPI.h>
 #include <Arduino_GFX_Library.h>
 
-// is_shared_interface=true: RC522와 SPI를 같이 쓰므로 쓸 때마다 SPI 트랜잭션을 열고 닫는다
-static Arduino_HWSPI bus(PIN_TFT_DC, PIN_TFT_CS, &SPI, true);
-static Arduino_ILI9488_18bit tft(&bus, PIN_TFT_RST, TFT_ROTATION, TFT_INVERT);
+static Arduino_SWPAR8 bus(PIN_LCD_RS, PIN_LCD_CS, PIN_LCD_WR, PIN_LCD_RD,
+                          PIN_LCD_D[0], PIN_LCD_D[1], PIN_LCD_D[2], PIN_LCD_D[3],
+                          PIN_LCD_D[4], PIN_LCD_D[5], PIN_LCD_D[6], PIN_LCD_D[7]);
+static Arduino_HX8357B tft(&bus, PIN_LCD_RST, TFT_ROTATION, TFT_INVERT);
 static const char* const WX_NAME[5] = { "SUNNY", "CLOUDY", "RAIN", "SNOW", "--" };
 
 // ---------- 그린 자리 기억 ----------
@@ -45,7 +46,7 @@ static void remember(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t sig) {
 }
 
 void screensBegin() {
-  tft.begin(TFT_SPI_HZ);
+  tft.begin();
   tft.setTextWrap(false);
   tft.fillScreen(C_BLACK);       // 전체 칠하기는 여기서 한 번만 (500kHz에서 약 7초)
   boxCount = 0;

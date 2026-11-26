@@ -195,7 +195,7 @@ static void sendDeparture() {
 void setup() {
   // 두 SPI 장치의 선택선을 먼저 HIGH로 둔다. 화면을 초기화하는 동안 RC522가 그 신호를 받지 않게 한다
   pinMode(PIN_RFID_SS, OUTPUT); digitalWrite(PIN_RFID_SS, HIGH);
-  pinMode(PIN_TFT_CS, OUTPUT);  digitalWrite(PIN_TFT_CS, HIGH);
+  pinMode(PIN_LCD_CS, OUTPUT);  digitalWrite(PIN_LCD_CS, HIGH);
   Serial.begin(115200);
   SPI.begin();
   devicesBegin();

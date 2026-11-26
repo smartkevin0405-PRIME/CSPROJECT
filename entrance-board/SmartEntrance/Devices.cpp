@@ -13,7 +13,6 @@ static bool doorOpenedFlag = false;
 
 void devicesBegin() {
   pinMode(PIN_DOOR, INPUT_PULLUP);
-  pinMode(PIN_PIR, INPUT);
   pinMode(PIN_DHT, INPUT_PULLUP);
   matrix.begin();
   doorRaw = doorOpen = (digitalRead(PIN_DOOR) == DOOR_OPEN_LEVEL);
@@ -29,7 +28,7 @@ void devicesLoop() {
   }
 }
 
-bool pirActive() { return digitalRead(PIN_PIR) == PIR_ACTIVE_LEVEL; }
+bool pirActive() { return analogRead(PIN_PIR) > PIR_THRESHOLD; }
 bool doorIsOpen() { return doorOpen; }
 bool doorJustOpened() {
   bool f = doorOpenedFlag;

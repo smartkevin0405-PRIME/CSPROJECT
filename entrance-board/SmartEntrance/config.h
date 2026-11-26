@@ -15,30 +15,36 @@
 #define USE_TRAVEL_STUB  1
 #endif
 
-// ---------- 핀 (entrance-board/docs/hardware.md와 같다) ----------
-// 분압: 보드 → 화면·RC522로 나가는 6개(D7, D8, D9, D10, D11, D13)는 1kΩ + 2kΩ로 약 3.3V
-// 74HCT125: RC522 MISO → D12, PIR OUT → D2 를 5V 신호로 바꾼다
-const uint8_t PIN_PIR      = 2;   // PIR 출력 (74HCT125 2번 채널을 거쳐 5V)
-const uint8_t PIN_DHT      = 4;   // DHT11
-const uint8_t PIN_DOOR     = 5;   // 문 열림 센서 MC-38 (내부 풀업)
-const uint8_t PIN_TFT_RST  = 7;   // 화면 RESET (분압)
-const uint8_t PIN_TFT_DC   = 8;   // 화면 DC/RS (분압)
-const uint8_t PIN_TFT_CS   = 9;   // 화면 CS (분압)
-const uint8_t PIN_RFID_SS  = 10;  // RC522 SDA/SS (분압). 분압 전 신호가 74HCT125 1번 채널의 OE도 켠다
-// RC522 RST는 보드에 연결하지 않는다. 10kΩ으로 3.3V에 풀업하고 소프트웨어 리셋을 쓴다
-// SPI: D11 MOSI, D12 MISO(74HCT125를 거침), D13 SCK
+// ---------- 핀 (entrance-board/docs/wiring.html, 2026-11-26판과 같다) ----------
+// 화면: 3.5인치 8비트 병렬 실드 "3.5" TFT LCD for arduino uno" (빨간 기판, 화면 칩 HX8357B)
+//       실드 기판에 전압 변환 칩이 있어 화면 신호 13개는 보드에 바로 연결한다
+const int8_t PIN_LCD_RD  = A0;
+const int8_t PIN_LCD_WR  = A1;
+const int8_t PIN_LCD_RS  = A2;   // 명령/데이터 (DC)
+const int8_t PIN_LCD_CS  = A3;
+const int8_t PIN_LCD_RST = A4;
+const int8_t PIN_LCD_D[8] = { 8, 9, 2, 3, 4, 5, 6, 7 };   // LCD_D0..D7
+// 화면 실드의 RESET 핀은 아두이노 리셋이라 비워 둔다. 5V, 3.3V, GND는 모두 연결한다
+
+// RFID RC522 (SPI): D10 SDA, D11 MOSI, D13 SCK 는 분압(470Ω + 1kΩ, 약 3.4V)을 거친다
+//                   D12 MISO 는 바로 연결 (74HCT125N이 오면 그 칩을 거친다)
+//                   RST는 보드에 연결하지 않고 3.3V에 올린다(10kΩ 풀업 또는 직결). 소프트웨어 리셋을 쓴다
+const uint8_t PIN_RFID_SS  = 10;
+
+// 센서
+const uint8_t PIN_DHT      = 0;    // DHT11 DATA (D0)
+const uint8_t PIN_DOOR     = 1;    // 문 열림 센서 MC-38 (D1, 내부 풀업)
+const uint8_t PIN_PIR      = A5;   // PIR OUT. 3.3V 출력이라 아날로그로 읽는다 (74HCT125N을 거쳐도 그대로 동작)
 
 // ---------- 화면 ----------
-// 분압 상태에서 안정성을 먼저 보려고 500kHz로 시작한다. 이 속도에서는 화면 전체 칠하기가 약 7초 걸린다
-// (480 x 320 x 3바이트). 깨짐이 없으면 4MHz, 8MHz 순서로 올려 본다
-const uint32_t TFT_SPI_HZ   = 500000;
+// 소프트웨어 병렬 버스라 화면 전체를 칠하면 몇 초 걸린다. 그래서 바뀐 글자 자리만 다시 그린다
 const uint8_t  TFT_ROTATION = 1;        // 1 또는 3 (가로). 뒤집혀 보이면 바꾼다
-#define TFT_INVERT 1                    // IPS 패널은 보통 1. 색이 반전돼 보이면 0으로
+#define TFT_INVERT 0                    // 색이 반전돼 보이면 1로
 // RC522는 MFRC522 라이브러리가 정한 4MHz로 통신한다 (라이브러리 설정이라 여기서 바꾸지 않는다)
 
 // ---------- 센서 ----------
-const uint8_t  PIR_ACTIVE_LEVEL = HIGH; // 사람을 감지했을 때 D2 값
-const uint8_t  DOOR_OPEN_LEVEL  = HIGH; // 문이 열렸을 때 D5 값. 반대로 동작하면 LOW로
+const int      PIR_THRESHOLD    = 300;  // analogRead 0~1023. 이보다 크면 사람 감지 (약 1.5V)
+const uint8_t  DOOR_OPEN_LEVEL  = HIGH; // 문이 열렸을 때 D1 값. 반대로 동작하면 LOW로
 
 // ---------- 시간 (ms) ----------
 const uint32_t SHOW_MS          = 25000;   // 정보 표시 시간
@@ -99,8 +105,8 @@ public:
 
 // UID는 시리얼 모니터에 찍히는 값을 보고 바꾼다
 const User USERS[] = {
-  { "USER1",   { 0xDE, 0xAD, 0xBE, 0xEF }, 4, { 0, 1 }, 2 },
-  { "USER2",   { 0x12, 0x34, 0x56, 0x78 }, 4, { 1, 0 }, 1 },
+  { "USER1",   { 0xEB, 0x02, 0xEC, 0x05 }, 4, { 0, 1 }, 2 },   // 2026-11-26 실물에서 읽은 카드
+  { "USER2",   { 0x0D, 0x77, 0x42, 0x06 }, 4, { 1, 0 }, 1 },   // 2026-11-26 실물에서 읽은 카드(또는 키링)
 };
 const uint8_t USER_COUNT = sizeof(USERS) / sizeof(USERS[0]);
 
